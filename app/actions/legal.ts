@@ -101,7 +101,11 @@ export async function completeLegalCase(caseId: string): Promise<{ error?: strin
 
   const legalCase = await prisma.legalDueDiligenceCase.findUniqueOrThrow({
     where: { id: caseId },
-    select: { initiativeId: true, status: true },
+    select: {
+      initiativeId: true,
+      status: true,
+      initiative: { select: { assignedAlId: true, name: true } },
+    },
   });
 
   if (legalCase.status !== "VALIDATED") {
@@ -111,6 +115,16 @@ export async function completeLegalCase(caseId: string): Promise<{ error?: strin
   await prisma.legalDueDiligenceCase.update({
     where: { id: caseId },
     data: { status: "COMPLETE", completedDate: new Date() },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: legalCase.initiative.assignedAlId,
+      type: "LEGAL_DD_COMPLETED",
+      message: `Legal due diligence completed for "${legalCase.initiative.name}"`,
+      relatedType: "INITIATIVE",
+      relatedId: legalCase.initiativeId,
+    },
   });
 
   await prisma.initiative.update({
@@ -161,6 +175,24 @@ export async function requestRevision(
       data: { status: "REVISION_REQUESTED" },
     }),
   ]);
+
+  const ddCase = await prisma.legalDueDiligenceCase.findUniqueOrThrow({
+    where: { id: item.caseId },
+    select: {
+      initiativeId: true,
+      initiative: { select: { assignedAlId: true, name: true } },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: ddCase.initiative.assignedAlId,
+      type: "LEGAL_REVISION_REQUESTED",
+      message: `Revisions were requested on a legal DD document for "${ddCase.initiative.name}"`,
+      relatedType: "INITIATIVE",
+      relatedId: ddCase.initiativeId,
+    },
+  });
 
   revalidatePath(`/legal/${item.caseId}`);
   return {};

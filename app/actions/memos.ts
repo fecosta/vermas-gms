@@ -136,7 +136,14 @@ export async function submitPeerReview(
       memo: {
         include: {
           reviewReport: {
-            include: { application: { select: { initiativeId: true } } },
+            include: {
+              application: {
+                select: {
+                  initiativeId: true,
+                  initiative: { select: { assignedAlId: true, name: true } },
+                },
+              },
+            },
           },
         },
       },
@@ -172,6 +179,16 @@ export async function submitPeerReview(
       entityType: "INITIATIVE",
       entityId: initiativeId,
       after: { peerReviewId: reviewId, status: "COMPLETE" },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: review.memo.reviewReport.application.initiative.assignedAlId,
+      type: "PEER_COMMENT_SUBMITTED",
+      message: `A peer reviewer submitted their review for "${review.memo.reviewReport.application.initiative.name}"`,
+      relatedType: "INITIATIVE",
+      relatedId: initiativeId,
     },
   });
 

@@ -174,7 +174,7 @@ export async function moveInitiativeStage(
 
   const fullInitiative = await prisma.initiative.findUniqueOrThrow({
     where: { id },
-    select: { organizationId: true, assignedAlId: true },
+    select: { organizationId: true, assignedAlId: true, name: true },
   });
 
   await prisma.initiative.update({ where: { id }, data: { stage: toStage } });
@@ -230,6 +230,15 @@ export async function moveInitiativeStage(
         },
         update: {},
       });
+      await prisma.notification.create({
+        data: {
+          userId: firstAD.id,
+          type: "LEGAL_DD_STARTED",
+          message: `Legal due diligence started for "${fullInitiative.name}"`,
+          relatedType: "INITIATIVE",
+          relatedId: id,
+        },
+      });
     }
   }
 
@@ -245,6 +254,36 @@ export async function moveInitiativeStage(
       },
       update: {},
     });
+    await prisma.notification.create({
+      data: {
+        userId: fullInitiative.assignedAlId,
+        type: "ONBOARDING_STARTED",
+        message: `"${fullInitiative.name}" has entered onboarding`,
+        relatedType: "INITIATIVE",
+        relatedId: id,
+      },
+    });
+  }
+
+  if (toStage === "CONCEPT_REVIEW" || toStage === "CEO_COMMITTEE_REVIEW") {
+    const ceoUsers = await prisma.user.findMany({
+      where: { role: "CEO", isActive: true },
+      select: { id: true },
+    });
+    if (ceoUsers.length > 0) {
+      const notifType =
+        toStage === "CONCEPT_REVIEW" ? "CONCEPT_NOTE_SENT_TO_CEO" : "MEMO_SENT_TO_CEO";
+      const label = toStage === "CONCEPT_REVIEW" ? "concept" : "memo";
+      await prisma.notification.createMany({
+        data: ceoUsers.map((u) => ({
+          userId: u.id,
+          type: notifType,
+          message: `"${fullInitiative.name}" is ready for CEO ${label} review`,
+          relatedType: "INITIATIVE",
+          relatedId: id,
+        })),
+      });
+    }
   }
 
   await prisma.auditLog.create({

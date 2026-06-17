@@ -12,7 +12,25 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { MemoEditor } from "@/components/initiatives/memo-editor";
 import { NominateReviewersForm } from "@/components/initiatives/nominate-reviewers-form";
+import { RecordDecisionDialog } from "@/components/initiatives/record-decision-dialog";
+import { recordDecision } from "@/app/actions/decisions";
 import { ChevronLeftIcon } from "lucide-react";
+
+const OUTCOME_COLORS: Record<string, string> = {
+  APPROVED: "bg-green-100 text-green-800",
+  CONDITIONALLY_APPROVED: "bg-blue-100 text-blue-800",
+  REVISION_REQUESTED: "bg-yellow-100 text-yellow-800",
+  REJECTED: "bg-red-100 text-red-800",
+  DEFERRED: "bg-gray-100 text-gray-700",
+};
+
+const OUTCOME_LABELS: Record<string, string> = {
+  APPROVED: "Approved",
+  CONDITIONALLY_APPROVED: "Conditionally Approved",
+  REVISION_REQUESTED: "Revision Requested",
+  REJECTED: "Rejected",
+  DEFERRED: "Deferred",
+};
 
 const PR_STATUS_LABELS: Record<string, string> = {
   NOT_ASSIGNED: "Not assigned",
@@ -34,7 +52,17 @@ export default async function MemoPage({
 
   const initiative = await prisma.initiative.findUnique({
     where: { id },
-    select: { id: true, name: true, stage: true, assignedAlId: true },
+    select: {
+      id: true,
+      name: true,
+      stage: true,
+      assignedAlId: true,
+      decisions: {
+        where: { type: "MEMO" },
+        include: { decidedBy: { select: { id: true, name: true } } },
+        orderBy: { decidedAt: "desc" },
+      },
+    },
   });
   if (!initiative) notFound();
 
@@ -53,6 +81,9 @@ export default async function MemoPage({
     assignedAlId: initiative.assignedAlId,
     supportingAtIds: [],
   });
+  const canDecide =
+    can(user, "decision:record") && initiative.stage === "CEO_COMMITTEE_REVIEW";
+  const boundDecisionAction = recordDecision.bind(null, id);
 
   // Pre-fetch reviewer names to avoid async in render
   const reviewerNames: Record<string, string> = {};
@@ -76,7 +107,15 @@ export default async function MemoPage({
           <ChevronLeftIcon className="size-4 mr-1" />
           Back to initiative
         </Button>
-        <PageHeader title="Investment Memo" description={initiative.name} />
+        <PageHeader
+          title="Investment Memo"
+          description={initiative.name}
+          action={
+            canDecide ? (
+              <RecordDecisionDialog action={boundDecisionAction} decisionType="MEMO" />
+            ) : undefined
+          }
+        />
       </div>
 
       {!data?.memo ? (
@@ -165,6 +204,51 @@ export default async function MemoPage({
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>CEO decisions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {initiative.decisions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No CEO decisions recorded yet.
+                  {canDecide && " Use the button above to record a decision."}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {initiative.decisions.map((d) => (
+                    <div key={d.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            OUTCOME_COLORS[d.decision] ?? "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {OUTCOME_LABELS[d.decision] ?? d.decision}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {d.decidedBy.name} · {new Date(d.decidedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {d.rationale && (
+                        <p className="text-sm">
+                          <span className="font-medium">Rationale: </span>
+                          {d.rationale}
+                        </p>
+                      )}
+                      {d.conditions && (
+                        <p className="text-sm">
+                          <span className="font-medium">Conditions: </span>
+                          {d.conditions}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

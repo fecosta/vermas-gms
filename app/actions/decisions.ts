@@ -104,6 +104,7 @@ export async function recordDecision(
 
   revalidatePath(`/initiatives/${initiativeId}`);
   revalidatePath(`/initiatives/${initiativeId}/concept-review`);
+  revalidatePath(`/initiatives/${initiativeId}/memo`);
   revalidatePath("/initiatives");
   return { message: "Decision recorded." };
 }
