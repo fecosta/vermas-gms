@@ -13,6 +13,7 @@ function navItemsForRole(role: SessionUser["role"]): NavItem[] {
   const pipeline: NavItem[] = [
     { href: "/initiatives", label: "Pipeline" },
     { href: "/organizations", label: "Organizations" },
+    { href: "/contacts", label: "Contacts" },
   ];
 
   switch (role) {
@@ -28,7 +29,7 @@ function navItemsForRole(role: SessionUser["role"]): NavItem[] {
     case "TL":
       return [...base, { href: "/initiatives", label: "Pipeline" }];
     case "PEER_REVIEWER":
-      return [{ href: "/dashboard", label: "Dashboard" }];
+      return [{ href: "/dashboard", label: "Dashboard" }, { href: "/reviews", label: "My reviews" }];
     case "ADMIN":
       return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }, { href: "/admin", label: "Admin" }];
     default:

@@ -3,15 +3,19 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { getInitiative } from "@/lib/db/initiatives";
+import { getComments } from "@/lib/db/comments";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { AuditLogTable } from "@/components/shared/audit-log-table";
+import { CommentThread } from "@/components/shared/comment-thread";
 import { StageTransitionButton } from "@/components/initiatives/stage-transition-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/authz";
+import { addComment } from "@/app/actions/comments";
+import type { CommentRelatedType } from "@/app/generated/prisma/enums";
 import { EditIcon } from "lucide-react";
 
 interface Props {
@@ -31,6 +35,11 @@ export default async function InitiativeDetailPage({ params }: Props) {
   }
 
   const { initiative, auditLogs } = data;
+
+  const comments = await getComments("INITIATIVE" as CommentRelatedType, id);
+  const canComment = can(user, "comment:create");
+  const canViewInternal = can(user, "comment:view-internal");
+  const boundAddComment = addComment.bind(null, "INITIATIVE" as CommentRelatedType, id);
 
   const canEdit = can(user, "initiative:edit", {
     type: "initiative",
@@ -293,6 +302,22 @@ export default async function InitiativeDetailPage({ params }: Props) {
               <AuditLogTable entries={auditLogs} />
             </CardContent>
           </Card>
+
+          {canComment && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Comments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CommentThread
+                  comments={comments}
+                  addCommentAction={boundAddComment}
+                  canViewInternal={canViewInternal}
+                  canSetInternal={canViewInternal}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

@@ -100,3 +100,17 @@ export const KPISchema = z.object({
   cadence: z.string().max(200).optional(),
 });
 export type KPIInput = z.infer<typeof KPISchema>;
+
+export const StrategyDocSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200),
+  type: z.enum([
+    "PROCESS_MAP",
+    "INVESTMENT_CRITERIA",
+    "TOC",
+    "THESIS",
+    "LEARNING_AGENDA",
+  ]),
+  body: z.string().max(50000).optional(),
+  areaIds: z.array(z.string()).default([]),
+});
+export type StrategyDocInput = z.infer<typeof StrategyDocSchema>;
