@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { getNotifications } from "@/lib/db/notifications";
@@ -60,7 +61,18 @@ export default async function NotificationsPage() {
           <TableBody>
             {notifications.map((n) => (
               <TableRow key={n.id} className={n.isRead ? "" : "font-medium"}>
-                <TableCell className="text-sm">{n.message}</TableCell>
+                <TableCell className="text-sm">
+                  {n.relatedType === "INITIATIVE" && n.relatedId ? (
+                    <Link
+                      href={`/initiatives/${n.relatedId}`}
+                      className="hover:underline"
+                    >
+                      {n.message}
+                    </Link>
+                  ) : (
+                    n.message
+                  )}
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {TYPE_LABELS[n.type] ?? n.type}
                 </TableCell>

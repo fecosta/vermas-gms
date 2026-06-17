@@ -65,6 +65,16 @@ export function Nav({ user, unreadCount }: { user: SessionUser; unreadCount?: nu
           ))}
         </nav>
 
+        {user.role !== "PEER_REVIEWER" && (
+          <form action="/search" className="flex items-center">
+            <input
+              name="q"
+              placeholder="Search…"
+              className="h-7 rounded-md border border-input bg-transparent px-3 text-sm w-40 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </form>
+        )}
+
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground hidden sm:block">
             {user.name} · {user.role.replace("_", " ")}

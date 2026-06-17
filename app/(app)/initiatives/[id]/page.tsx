@@ -91,6 +91,7 @@ export default async function InitiativeDetailPage({ params }: Props) {
     MEMO_DRAFTING: `./memo`,
     PEER_REVIEW: `./memo`,
     CEO_COMMITTEE_REVIEW: `./memo`,
+    MEMO_DECISION: `./memo`,
     ONBOARDING: `./onboarding`,
     ACTIVE: `./active`,
     ...(legalCase ? {
