@@ -1,8 +1,10 @@
 import { auth } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge, STAGE_LABELS } from "@/components/shared/stage-badge";
 import { AuditLogTable } from "@/components/shared/audit-log-table";
@@ -20,38 +22,88 @@ const FUNNEL_STAGES: Stage[] = [
   "ACTIVE",
 ];
 
+const CASE_STATUS_LABELS: Record<string, string> = {
+  NOT_STARTED: "Not started",
+  REQUESTED: "Requested",
+  DOCUMENTS_PENDING: "Documents pending",
+  SUBMITTED: "Submitted",
+  UNDER_AD_REVIEW: "Under review",
+  REVISIONS_REQUESTED: "Revisions requested",
+  RESUBMITTED: "Resubmitted",
+  TRUST_VALIDATION: "Trust validation",
+  VALIDATED: "Validated",
+  REJECTED: "Rejected",
+  COMPLETE: "Complete",
+};
+
 export default async function DashboardPage() {
   const session = await auth();
   const user = session!.user as unknown as SessionUser;
 
+  if (user.role === "PEER_REVIEWER") redirect("/reviews");
+
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [stageCounts, pendingDecisionInitiatives, stuckInitiatives, recentLogs, legalInProgress] =
-    await Promise.all([
-      prisma.initiative.groupBy({ by: ["stage"], _count: true }),
-      prisma.initiative.findMany({
-        where: { stage: { in: ["CONCEPT_REVIEW", "CEO_COMMITTEE_REVIEW"] } },
-        select: { id: true, name: true, stage: true, updatedAt: true },
-        orderBy: { updatedAt: "asc" },
-      }),
-      prisma.initiative.findMany({
-        where: {
-          stage: { notIn: ["ACTIVE"] },
-          updatedAt: { lt: thirtyDaysAgo },
-        },
-        select: { id: true, name: true, stage: true, updatedAt: true },
-        orderBy: { updatedAt: "asc" },
-        take: 10,
-      }),
-      prisma.auditLog.findMany({
-        include: { actor: { select: { id: true, name: true, role: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-      }),
-      prisma.legalDueDiligenceCase.count({
-        where: { status: { notIn: ["COMPLETE", "REJECTED"] } },
-      }),
-    ]);
+  const [
+    stageCounts,
+    pendingDecisionInitiatives,
+    stuckInitiatives,
+    recentLogs,
+    legalInProgress,
+    myInitiatives,
+    myLegalCases,
+    strategyDocsNeedingAttention,
+  ] = await Promise.all([
+    prisma.initiative.groupBy({ by: ["stage"], _count: true }),
+    prisma.initiative.findMany({
+      where: { stage: { in: ["CONCEPT_REVIEW", "CEO_COMMITTEE_REVIEW"] } },
+      select: { id: true, name: true, stage: true, updatedAt: true },
+      orderBy: { updatedAt: "asc" },
+    }),
+    prisma.initiative.findMany({
+      where: {
+        stage: { notIn: ["ACTIVE"] },
+        updatedAt: { lt: thirtyDaysAgo },
+      },
+      select: { id: true, name: true, stage: true, updatedAt: true },
+      orderBy: { updatedAt: "asc" },
+      take: 10,
+    }),
+    prisma.auditLog.findMany({
+      include: { actor: { select: { id: true, name: true, role: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    prisma.legalDueDiligenceCase.count({
+      where: { status: { notIn: ["COMPLETE", "REJECTED"] } },
+    }),
+    user.role === "AL"
+      ? prisma.initiative.findMany({
+          where: { assignedAlId: user.id, stage: { notIn: ["ACTIVE"] } },
+          select: { id: true, name: true, stage: true, updatedAt: true },
+          orderBy: { updatedAt: "desc" },
+          take: 8,
+        })
+      : Promise.resolve([] as { id: string; name: string; stage: Stage; updatedAt: Date }[]),
+    user.role === "AD"
+      ? prisma.legalDueDiligenceCase.findMany({
+          where: { adId: user.id, status: { notIn: ["COMPLETE", "REJECTED"] } },
+          select: {
+            id: true,
+            status: true,
+            initiative: { select: { name: true } },
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+      : Promise.resolve([] as { id: string; status: string; initiative: { name: string } }[]),
+    user.role === "KMD"
+      ? prisma.strategyDocument.findMany({
+          where: { status: { in: ["DRAFT", "IN_REVIEW"] } },
+          select: { id: true, title: true, status: true },
+          orderBy: { updatedAt: "desc" },
+        })
+      : Promise.resolve([] as { id: string; title: string; status: string }[]),
+  ]);
 
   const countByStage: Record<string, number> = {};
   for (const s of stageCounts) {
@@ -66,6 +118,103 @@ export default async function DashboardPage() {
         title="Dashboard"
         description={`Welcome back, ${user.name}`}
       />
+
+      {/* Role-specific "My work" section */}
+      {user.role === "AL" && myInitiatives.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              My pipeline
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({myInitiatives.length})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {myInitiatives.map((i) => {
+                const daysAgo = Math.floor(
+                  (Date.now() - new Date(i.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+                );
+                return (
+                  <Link
+                    key={i.id}
+                    href={`/initiatives/${i.id}`}
+                    className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
+                  >
+                    <span className="text-sm truncate mr-2">{i.name}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <StageBadge stage={i.stage} />
+                      <span className="text-xs text-muted-foreground">{daysAgo}d ago</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {user.role === "AD" && myLegalCases.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              My legal cases
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({myLegalCases.length})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {myLegalCases.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/legal/${c.id}`}
+                  className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
+                >
+                  <span className="text-sm truncate mr-2">{c.initiative.name}</span>
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    {CASE_STATUS_LABELS[c.status] ?? c.status}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {user.role === "KMD" && strategyDocsNeedingAttention.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Strategy documents
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({strategyDocsNeedingAttention.length} pending)
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {strategyDocsNeedingAttention.map((doc) => (
+                <Link
+                  key={doc.id}
+                  href={`/strategy/${doc.id}`}
+                  className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
+                >
+                  <span className="text-sm truncate mr-2">{doc.title}</span>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs shrink-0 ${doc.status === "IN_REVIEW" ? "border-amber-300 text-amber-700" : ""}`}
+                  >
+                    {doc.status.replace("_", " ")}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pipeline stat cards */}
       <div className="grid grid-cols-3 gap-3 lg:grid-cols-5">

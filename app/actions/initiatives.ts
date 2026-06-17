@@ -262,3 +262,33 @@ export async function moveInitiativeStage(
   revalidatePath("/initiatives");
   return {};
 }
+
+export async function assignCriteriaSet(
+  initiativeId: string,
+  criteriaSetId: string | null
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+
+  const initiative = await prisma.initiative.findUniqueOrThrow({
+    where: { id: initiativeId },
+    select: {
+      assignedAlId: true,
+      supportingAt: { select: { userId: true } },
+    },
+  });
+
+  assertCan(user, "initiative:edit", {
+    type: "initiative",
+    assignedAlId: initiative.assignedAlId,
+    supportingAtIds: initiative.supportingAt.map((s) => s.userId),
+  });
+
+  await prisma.initiative.update({
+    where: { id: initiativeId },
+    data: { criteriaSetId },
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}`);
+  return {};
+}

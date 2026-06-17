@@ -6,6 +6,8 @@ import { getInitiative } from "@/lib/db/initiatives";
 import { getComments } from "@/lib/db/comments";
 import { getMeetings } from "@/lib/db/meetings";
 import { CreateMeetingDialog } from "@/components/meetings/create-meeting-dialog";
+import { CriteriaAssignment } from "@/components/initiatives/criteria-assignment";
+import { prisma } from "@/lib/db/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { AuditLogTable } from "@/components/shared/audit-log-table";
@@ -38,9 +40,10 @@ export default async function InitiativeDetailPage({ params }: Props) {
 
   const { initiative, auditLogs } = data;
 
-  const [comments, meetings] = await Promise.all([
+  const [comments, meetings, criteriaSets] = await Promise.all([
     getComments("INITIATIVE" as CommentRelatedType, id),
     getMeetings(id),
+    prisma.criteriaSet.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   const canComment = can(user, "comment:create");
   const canLogMeeting = can(user, "meeting:create");
@@ -190,6 +193,40 @@ export default async function InitiativeDetailPage({ params }: Props) {
                   <NoteRow label="Execution capacity" value={initiative.executionCapacityNotes} />
                 )}
               </CardContent>
+            </Card>
+          )}
+
+          {(initiative.criteriaSet || canEdit) && (
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <CardTitle className="text-sm font-medium">Evaluation criteria</CardTitle>
+                {canEdit && (
+                  <CriteriaAssignment
+                    initiativeId={id}
+                    currentSetId={initiative.criteriaSet?.id ?? null}
+                    criteriaSets={criteriaSets}
+                  />
+                )}
+              </CardHeader>
+              {initiative.criteriaSet ? (
+                <CardContent className="space-y-1">
+                  <p className="text-xs text-muted-foreground mb-2">{initiative.criteriaSet.name}</p>
+                  <div className="divide-y">
+                    {initiative.criteriaSet.items.map((item) => (
+                      <div key={item.id} className="py-2 text-sm">
+                        <span className="font-medium">{item.label}</span>
+                        {item.guidance && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{item.guidance}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">No criteria set assigned.</p>
+                </CardContent>
+              )}
             </Card>
           )}
 
