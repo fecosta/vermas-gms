@@ -6,6 +6,7 @@ import { getUsers } from "@/lib/db/users";
 import { prisma } from "@/lib/db/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Link from "next/link";
 import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
 import { UserActionsCell } from "@/components/admin/user-actions-cell";
 
@@ -33,7 +35,14 @@ export default async function AdminPage() {
       <PageHeader
         title="Admin"
         description="Manage users and system settings"
-        action={<InviteUserDialog areas={areas} />}
+        action={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" render={<Link href="/admin/areas" />}>
+              Manage areas
+            </Button>
+            <InviteUserDialog areas={areas} />
+          </div>
+        }
       />
 
       <Table>

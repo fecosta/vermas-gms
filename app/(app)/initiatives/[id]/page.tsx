@@ -10,6 +10,7 @@ import { CriteriaAssignment } from "@/components/initiatives/criteria-assignment
 import { ContactAssignment } from "@/components/initiatives/contact-assignment";
 import { SupportingAtAssignment } from "@/components/initiatives/supporting-at-assignment";
 import { MeetingParticipantsSection } from "@/components/initiatives/meeting-participants-section";
+import { EditMeetingDialog } from "@/components/meetings/edit-meeting-dialog";
 import { prisma } from "@/lib/db/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
@@ -412,6 +413,7 @@ export default async function InitiativeDetailPage({ params }: Props) {
                           {m.type.replace("_", " ")}
                         </Badge>
                         <span className="font-medium">{m.title}</span>
+                        {canLogMeeting && <EditMeetingDialog meeting={m} />}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {new Date(m.dateTime).toLocaleDateString("en-US", {

@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { MemoEditor } from "@/components/initiatives/memo-editor";
 import { NominateReviewersForm } from "@/components/initiatives/nominate-reviewers-form";
 import { RecordDecisionDialog } from "@/components/initiatives/record-decision-dialog";
+import { StageTransitionButton } from "@/components/initiatives/stage-transition-button";
 import { recordDecision } from "@/app/actions/decisions";
 import { ChevronLeftIcon } from "lucide-react";
 
@@ -83,6 +84,7 @@ export default async function MemoPage({
   });
   const canDecide =
     can(user, "decision:record") && initiative.stage === "CEO_COMMITTEE_REVIEW";
+  const lastMemoDecision = initiative.decisions[0]?.decision ?? null;
   const boundDecisionAction = recordDecision.bind(null, id);
 
   // Pre-fetch reviewer names to avoid async in render
@@ -117,6 +119,14 @@ export default async function MemoPage({
           }
         />
       </div>
+
+      {initiative.stage === "MEMO_DECISION" && (
+        <StageTransitionButton
+          initiative={{ id: initiative.id, stage: initiative.stage, assignedAlId: initiative.assignedAlId ?? "" }}
+          user={user}
+          context={{ lastMemoDecision }}
+        />
+      )}
 
       {!data?.memo ? (
         <EmptyState

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { RecordDecisionDialog } from "@/components/initiatives/record-decision-dialog";
+import { StageTransitionButton } from "@/components/initiatives/stage-transition-button";
 import { recordDecision } from "@/app/actions/decisions";
 import { ChevronLeftIcon } from "lucide-react";
 
@@ -43,6 +44,7 @@ export default async function ConceptReviewPage({
       name: true,
       stage: true,
       summary: true,
+      assignedAlId: true,
       decisions: {
         where: { type: "CONCEPT" },
         include: { decidedBy: { select: { id: true, name: true } } },
@@ -55,6 +57,9 @@ export default async function ConceptReviewPage({
 
   const canDecide =
     can(user, "decision:record") && initiative.stage === "CONCEPT_REVIEW";
+
+  const lastConceptDecision =
+    initiative.decisions[0]?.decision ?? null;
 
   const boundAction = recordDecision.bind(null, id);
 
@@ -75,6 +80,14 @@ export default async function ConceptReviewPage({
           }
         />
       </div>
+
+      {initiative.stage === "CONCEPT_DECISION" && (
+        <StageTransitionButton
+          initiative={{ id: initiative.id, stage: initiative.stage, assignedAlId: initiative.assignedAlId ?? "" }}
+          user={user}
+          context={{ lastConceptDecision }}
+        />
+      )}
 
       <Card>
         <CardHeader>

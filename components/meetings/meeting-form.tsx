@@ -15,12 +15,23 @@ import {
 
 type State = { errors?: Record<string, string[]>; message?: string } | null;
 
+interface Initial {
+  type?: string;
+  title?: string;
+  dateTime?: Date | string;
+  externalParticipants?: string | null;
+  agenda?: string | null;
+  minutes?: string | null;
+  decisions?: string | null;
+}
+
 interface MeetingFormProps {
   action: (prev: State, formData: FormData) => Promise<State>;
   onSuccess?: () => void;
+  initial?: Initial;
 }
 
-export function MeetingForm({ action, onSuccess }: MeetingFormProps) {
+export function MeetingForm({ action, onSuccess, initial }: MeetingFormProps) {
   const [state, formAction, pending] = useActionState(async (prev: State, formData: FormData) => {
     const result = await action(prev, formData);
     if (result?.message && !result?.errors) {
@@ -29,12 +40,16 @@ export function MeetingForm({ action, onSuccess }: MeetingFormProps) {
     return result;
   }, null);
 
+  const dateTimeValue = initial?.dateTime
+    ? new Date(initial.dateTime).toISOString().slice(0, 16)
+    : "";
+
   return (
     <form action={formAction} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="type">Type *</Label>
-          <Select name="type">
+          <Select name="type" defaultValue={initial?.type}>
             <SelectTrigger id="type" className="w-full">
               <SelectValue placeholder="Select type…" />
             </SelectTrigger>
@@ -55,6 +70,7 @@ export function MeetingForm({ action, onSuccess }: MeetingFormProps) {
             id="dateTime"
             name="dateTime"
             type="datetime-local"
+            defaultValue={dateTimeValue}
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           {state?.errors?.dateTime && (
@@ -65,7 +81,12 @@ export function MeetingForm({ action, onSuccess }: MeetingFormProps) {
 
       <div className="space-y-1.5">
         <Label htmlFor="title">Title *</Label>
-        <Input id="title" name="title" placeholder="e.g. Concept review with team" />
+        <Input
+          id="title"
+          name="title"
+          placeholder="e.g. Concept review with team"
+          defaultValue={initial?.title ?? ""}
+        />
         {state?.errors?.title && (
           <p className="text-xs text-destructive">{state.errors.title[0]}</p>
         )}
@@ -73,22 +94,45 @@ export function MeetingForm({ action, onSuccess }: MeetingFormProps) {
 
       <div className="space-y-1.5">
         <Label htmlFor="externalParticipants">External participants</Label>
-        <Input id="externalParticipants" name="externalParticipants" placeholder="Names of external attendees" />
+        <Input
+          id="externalParticipants"
+          name="externalParticipants"
+          placeholder="Names of external attendees"
+          defaultValue={initial?.externalParticipants ?? ""}
+        />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="agenda">Agenda</Label>
-        <Textarea id="agenda" name="agenda" rows={3} placeholder="Meeting agenda…" />
+        <Textarea
+          id="agenda"
+          name="agenda"
+          rows={3}
+          placeholder="Meeting agenda…"
+          defaultValue={initial?.agenda ?? ""}
+        />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="minutes">Minutes</Label>
-        <Textarea id="minutes" name="minutes" rows={4} placeholder="Meeting minutes…" />
+        <Textarea
+          id="minutes"
+          name="minutes"
+          rows={4}
+          placeholder="Meeting minutes…"
+          defaultValue={initial?.minutes ?? ""}
+        />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="decisions">Decisions</Label>
-        <Textarea id="decisions" name="decisions" rows={3} placeholder="Key decisions made…" />
+        <Textarea
+          id="decisions"
+          name="decisions"
+          rows={3}
+          placeholder="Key decisions made…"
+          defaultValue={initial?.decisions ?? ""}
+        />
       </div>
 
       {state?.message && !state?.errors && (
