@@ -125,6 +125,14 @@ export const CriteriaItemSchema = z.object({
 });
 export type CriteriaItemInput = z.infer<typeof CriteriaItemSchema>;
 
+export const ApplicationEditSchema = z.object({
+  type: z.string().max(100).optional(),
+  whyYes: z.string().max(5000).optional(),
+  whyNot: z.string().max(5000).optional(),
+  submittedDate: z.coerce.date().optional(),
+});
+export type ApplicationEditInput = z.infer<typeof ApplicationEditSchema>;
+
 export const StrategyDocSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   type: z.enum([

@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { GrantForm } from "@/components/grants/grant-form";
 import { KPITable } from "@/components/grants/kpi-table";
 import { createOrUpdateGrant } from "@/app/actions/grants";
+import { CompleteOnboardingButton } from "@/components/initiatives/complete-onboarding-button";
 import { ChevronLeftIcon } from "lucide-react";
 
 export default async function OnboardingPage({
@@ -49,8 +50,22 @@ export default async function OnboardingPage({
           <ChevronLeftIcon className="size-4 mr-1" />
           Back to initiative
         </Button>
-        <PageHeader title="Onboarding" description={initiative.name} />
+        <PageHeader
+          title="Onboarding"
+          description={initiative.name}
+          action={
+            canEdit && grant && grant.onboardingStatus !== "COMPLETED" ? (
+              <CompleteOnboardingButton initiativeId={id} />
+            ) : undefined
+          }
+        />
       </div>
+
+      {grant?.onboardingStatus === "COMPLETED" && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          Onboarding complete. This initiative is now active.
+        </div>
+      )}
 
       {grant && (
         <div className="grid grid-cols-3 gap-4 text-sm">

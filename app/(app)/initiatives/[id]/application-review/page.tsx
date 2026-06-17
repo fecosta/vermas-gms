@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReviewReportStatusCard } from "@/components/review/review-report-status-card";
+import { can } from "@/lib/authz";
+import { ApplicationEditForm } from "@/components/initiatives/application-edit-form";
 import { ChevronLeftIcon } from "lucide-react";
 
 export default async function ApplicationReviewPage({
@@ -27,6 +29,7 @@ export default async function ApplicationReviewPage({
   if (!initiative) notFound();
 
   const data = await getApplication(id);
+  const canEditApp = can(user, "application:edit");
 
   return (
     <div className="space-y-6">
@@ -54,21 +57,50 @@ export default async function ApplicationReviewPage({
             <CardHeader>
               <CardTitle>Application</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm space-y-1">
-              <p>
-                <span className="font-medium">Status: </span>
-                {data.application.status.replace("_", " ")}
-              </p>
-              {data.application.submittedDate && (
+            <CardContent className="text-sm space-y-3">
+              <div className="space-y-1">
                 <p>
-                  <span className="font-medium">Submitted: </span>
-                  {new Date(data.application.submittedDate).toLocaleDateString()}
+                  <span className="font-medium">Status: </span>
+                  {data.application.status.replace("_", " ")}
                 </p>
+                {data.application.submittedDate && (
+                  <p>
+                    <span className="font-medium">Submitted: </span>
+                    {new Date(data.application.submittedDate).toLocaleDateString()}
+                  </p>
+                )}
+                <p>
+                  <span className="font-medium">AL: </span>
+                  {data.application.al.name}
+                </p>
+              </div>
+
+              {canEditApp ? (
+                <ApplicationEditForm
+                  applicationId={data.application.id}
+                  initial={{
+                    type: data.application.type,
+                    whyYes: data.application.whyYes,
+                    whyNot: data.application.whyNot,
+                    submittedDate: data.application.submittedDate,
+                  }}
+                />
+              ) : (
+                <>
+                  {data.application.whyYes && (
+                    <div>
+                      <p className="font-medium mb-0.5">Why proceed?</p>
+                      <p className="text-muted-foreground">{data.application.whyYes}</p>
+                    </div>
+                  )}
+                  {data.application.whyNot && (
+                    <div>
+                      <p className="font-medium mb-0.5">Concerns</p>
+                      <p className="text-muted-foreground">{data.application.whyNot}</p>
+                    </div>
+                  )}
+                </>
               )}
-              <p>
-                <span className="font-medium">AL: </span>
-                {data.application.al.name}
-              </p>
             </CardContent>
           </Card>
 

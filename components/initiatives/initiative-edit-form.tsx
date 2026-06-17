@@ -258,6 +258,27 @@ export function InitiativeEditForm({
         </div>
       </section>
 
+      <section className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          Technical review
+        </h3>
+        <div className="space-y-1.5">
+          <Label htmlFor="needsTechReview">Technical review required?</Label>
+          <Select
+            name="needsTechReview"
+            defaultValue={initiative.needsTechReview ? "true" : "false"}
+          >
+            <SelectTrigger id="needsTechReview" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="false">No</SelectItem>
+              <SelectItem value="true">Yes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </section>
+
       {state?.message && !state.errors && (
         <p className="text-sm text-green-600">{state.message}</p>
       )}

@@ -111,3 +111,45 @@ export async function deleteKPI(kpiId: string): Promise<void> {
 
   revalidatePath(`/initiatives/${kpi.grant.initiativeId}/onboarding`);
 }
+
+export async function completeOnboarding(
+  initiativeId: string
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "grant:edit");
+
+  const grant = await prisma.grant.findUnique({
+    where: { initiativeId },
+    select: { id: true, onboardingStatus: true },
+  });
+
+  if (!grant) return { error: "No grant found for this initiative." };
+  if (grant.onboardingStatus === "COMPLETED") return { error: "Onboarding already completed." };
+
+  await prisma.grant.update({
+    where: { id: grant.id },
+    data: { onboardingStatus: "COMPLETED" },
+  });
+
+  await prisma.initiative.update({
+    where: { id: initiativeId },
+    data: { stage: "ACTIVE" },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "STAGE_CHANGE",
+      entityType: "INITIATIVE",
+      entityId: initiativeId,
+      before: { stage: "ONBOARDING" },
+      after: { stage: "ACTIVE" },
+    },
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}/onboarding`);
+  revalidatePath(`/initiatives/${initiativeId}`);
+  revalidatePath("/initiatives");
+  return {};
+}
