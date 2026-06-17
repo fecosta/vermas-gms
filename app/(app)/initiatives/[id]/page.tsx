@@ -7,6 +7,8 @@ import { getComments } from "@/lib/db/comments";
 import { getMeetings } from "@/lib/db/meetings";
 import { CreateMeetingDialog } from "@/components/meetings/create-meeting-dialog";
 import { CriteriaAssignment } from "@/components/initiatives/criteria-assignment";
+import { ContactAssignment } from "@/components/initiatives/contact-assignment";
+import { SupportingAtAssignment } from "@/components/initiatives/supporting-at-assignment";
 import { prisma } from "@/lib/db/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
@@ -40,10 +42,19 @@ export default async function InitiativeDetailPage({ params }: Props) {
 
   const { initiative, auditLogs } = data;
 
-  const [comments, meetings, criteriaSets] = await Promise.all([
+  const [comments, meetings, criteriaSets, allContacts, atUsers] = await Promise.all([
     getComments("INITIATIVE" as CommentRelatedType, id),
     getMeetings(id),
     prisma.criteriaSet.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.contact.findMany({
+      orderBy: { fullName: "asc" },
+      select: { id: true, fullName: true, title: true },
+    }),
+    prisma.user.findMany({
+      where: { role: { in: ["AT", "AL"] }, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, role: true },
+    }),
   ]);
   const canComment = can(user, "comment:create");
   const canLogMeeting = can(user, "meeting:create");
@@ -295,7 +306,13 @@ export default async function InitiativeDetailPage({ params }: Props) {
               <CardTitle className="text-sm font-medium">Supporting team</CardTitle>
             </CardHeader>
             <CardContent>
-              {initiative.supportingAt.length === 0 ? (
+              {canEdit ? (
+                <SupportingAtAssignment
+                  initiativeId={id}
+                  currentTeam={initiative.supportingAt}
+                  atUsers={atUsers}
+                />
+              ) : initiative.supportingAt.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No supporting AT assigned.</p>
               ) : (
                 <div className="space-y-1">
@@ -312,12 +329,20 @@ export default async function InitiativeDetailPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {initiative.contacts.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Contacts</CardTitle>
-              </CardHeader>
-              <CardContent>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Contacts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {canEdit ? (
+                <ContactAssignment
+                  initiativeId={id}
+                  linked={initiative.contacts}
+                  allContacts={allContacts}
+                />
+              ) : initiative.contacts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No contacts assigned.</p>
+              ) : (
                 <div className="space-y-2">
                   {initiative.contacts.map((ic) => (
                     <div key={ic.contactId}>
@@ -333,9 +358,9 @@ export default async function InitiativeDetailPage({ params }: Props) {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

@@ -292,3 +292,56 @@ export async function assignCriteriaSet(
   revalidatePath(`/initiatives/${initiativeId}`);
   return {};
 }
+
+export async function addSupportingAt(
+  initiativeId: string,
+  userId: string
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+
+  const initiative = await prisma.initiative.findUniqueOrThrow({
+    where: { id: initiativeId },
+    select: { assignedAlId: true, supportingAt: { select: { userId: true } } },
+  });
+
+  assertCan(user, "initiative:edit", {
+    type: "initiative",
+    assignedAlId: initiative.assignedAlId,
+    supportingAtIds: initiative.supportingAt.map((s) => s.userId),
+  });
+
+  await prisma.initiativeSupport.upsert({
+    where: { initiativeId_userId: { initiativeId, userId } },
+    create: { initiativeId, userId },
+    update: {},
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}`);
+  return {};
+}
+
+export async function removeSupportingAt(
+  initiativeId: string,
+  userId: string
+): Promise<void> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+
+  const initiative = await prisma.initiative.findUniqueOrThrow({
+    where: { id: initiativeId },
+    select: { assignedAlId: true, supportingAt: { select: { userId: true } } },
+  });
+
+  assertCan(user, "initiative:edit", {
+    type: "initiative",
+    assignedAlId: initiative.assignedAlId,
+    supportingAtIds: initiative.supportingAt.map((s) => s.userId),
+  });
+
+  await prisma.initiativeSupport.delete({
+    where: { initiativeId_userId: { initiativeId, userId } },
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}`);
+}

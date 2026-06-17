@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { assertCan } from "@/lib/authz";
 import { ContactSchema } from "@/lib/validations";
 
 export type ContactFormState = {
@@ -87,4 +88,57 @@ export async function updateContact(
   revalidatePath("/contacts");
   revalidatePath(`/contacts/${id}`);
   return { message: "Contact updated." };
+}
+
+export async function linkContactToInitiative(
+  initiativeId: string,
+  contactId: string
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+
+  const initiative = await prisma.initiative.findUniqueOrThrow({
+    where: { id: initiativeId },
+    select: { assignedAlId: true, supportingAt: { select: { userId: true } } },
+  });
+
+  assertCan(user, "initiative:edit", {
+    type: "initiative",
+    assignedAlId: initiative.assignedAlId,
+    supportingAtIds: initiative.supportingAt.map((s) => s.userId),
+  });
+
+  await prisma.initiativeContact.upsert({
+    where: { initiativeId_contactId: { initiativeId, contactId } },
+    create: { initiativeId, contactId },
+    update: {},
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}`);
+  return {};
+}
+
+export async function unlinkContactFromInitiative(
+  initiativeId: string,
+  contactId: string
+): Promise<void> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+
+  const initiative = await prisma.initiative.findUniqueOrThrow({
+    where: { id: initiativeId },
+    select: { assignedAlId: true, supportingAt: { select: { userId: true } } },
+  });
+
+  assertCan(user, "initiative:edit", {
+    type: "initiative",
+    assignedAlId: initiative.assignedAlId,
+    supportingAtIds: initiative.supportingAt.map((s) => s.userId),
+  });
+
+  await prisma.initiativeContact.delete({
+    where: { initiativeId_contactId: { initiativeId, contactId } },
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}`);
 }

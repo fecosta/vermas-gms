@@ -5,9 +5,7 @@ import { getAreas } from "@/lib/db/areas";
 import { getOrganizations } from "@/lib/db/organizations";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PipelineBoard } from "@/components/initiatives/pipeline-board";
-import { InitiativeTable } from "@/components/initiatives/initiative-table";
+import { PipelineFilter } from "@/components/initiatives/pipeline-filter";
 import { CreateInitiativeDialog } from "@/components/initiatives/create-initiative-dialog";
 
 export default async function InitiativesPage() {
@@ -49,18 +47,7 @@ export default async function InitiativesPage() {
           }
         />
       ) : (
-        <Tabs defaultValue="board">
-          <TabsList>
-            <TabsTrigger value="board">Board</TabsTrigger>
-            <TabsTrigger value="list">List</TabsTrigger>
-          </TabsList>
-          <TabsContent value="board" className="mt-4">
-            <PipelineBoard initiatives={initiatives} />
-          </TabsContent>
-          <TabsContent value="list" className="mt-4">
-            <InitiativeTable initiatives={initiatives} />
-          </TabsContent>
-        </Tabs>
+        <PipelineFilter initiatives={initiatives} />
       )}
     </div>
   );
