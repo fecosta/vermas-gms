@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ReviewReportStatusCard } from "@/components/review/review-report-status-card";
 import { can } from "@/lib/authz";
 import { ApplicationEditForm } from "@/components/initiatives/application-edit-form";
+import { ApplicationStatusControls } from "@/components/initiatives/application-status-controls";
 import { ChevronLeftIcon } from "lucide-react";
 
 export default async function ApplicationReviewPage({
@@ -59,10 +60,17 @@ export default async function ApplicationReviewPage({
             </CardHeader>
             <CardContent className="text-sm space-y-3">
               <div className="space-y-1">
-                <p>
-                  <span className="font-medium">Status: </span>
-                  {data.application.status.replace("_", " ")}
-                </p>
+                {canEditApp ? (
+                  <ApplicationStatusControls
+                    applicationId={data.application.id}
+                    currentStatus={data.application.status}
+                  />
+                ) : (
+                  <p>
+                    <span className="font-medium">Status: </span>
+                    {data.application.status.replace("_", " ")}
+                  </p>
+                )}
                 {data.application.submittedDate && (
                   <p>
                     <span className="font-medium">Submitted: </span>

@@ -265,6 +265,30 @@ export async function moveInitiativeStage(
     });
   }
 
+  if (toStage === "APPLICATION_RECEIVED" && fullInitiative.assignedAlId) {
+    await prisma.notification.create({
+      data: {
+        userId: fullInitiative.assignedAlId,
+        type: "APPLICATION_RECEIVED",
+        message: `Application received for "${fullInitiative.name}"`,
+        relatedType: "INITIATIVE",
+        relatedId: id,
+      },
+    });
+  }
+
+  if (toStage === "APPLICATION_REVIEW" && fullInitiative.assignedAlId) {
+    await prisma.notification.create({
+      data: {
+        userId: fullInitiative.assignedAlId,
+        type: "AL_RESPONSE_NEEDED",
+        message: `Application review started for "${fullInitiative.name}". Your response is needed.`,
+        relatedType: "INITIATIVE",
+        relatedId: id,
+      },
+    });
+  }
+
   if (toStage === "CONCEPT_REVIEW" || toStage === "CEO_COMMITTEE_REVIEW") {
     const ceoUsers = await prisma.user.findMany({
       where: { role: "CEO", isActive: true },

@@ -6,6 +6,7 @@ import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { assertCan } from "@/lib/authz";
 import { ApplicationEditSchema } from "@/lib/validations";
+import type { ApplicationStatus } from "@/app/generated/prisma/enums";
 
 export type ApplicationEditState = {
   errors?: Record<string, string[]>;
@@ -41,4 +42,26 @@ export async function updateApplication(
 
   revalidatePath(`/initiatives/${app.initiativeId}/application-review`);
   return { message: "Application updated." };
+}
+
+export async function updateApplicationStatus(
+  applicationId: string,
+  status: ApplicationStatus
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "application:edit");
+
+  const app = await prisma.application.findUniqueOrThrow({
+    where: { id: applicationId },
+    select: { initiativeId: true },
+  });
+
+  await prisma.application.update({
+    where: { id: applicationId },
+    data: { status },
+  });
+
+  revalidatePath(`/initiatives/${app.initiativeId}/application-review`);
+  return {};
 }

@@ -105,6 +105,20 @@ export default async function DashboardPage() {
       : Promise.resolve([] as { id: string; title: string; status: string }[]),
   ]);
 
+  const onboardingInitiatives =
+    user.role === "AT"
+      ? await prisma.initiative.findMany({
+          where: { stage: "ONBOARDING" },
+          select: {
+            id: true,
+            name: true,
+            assignedAl: { select: { name: true } },
+            grant: { select: { onboardingStatus: true } },
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+      : [];
+
   const countByStage: Record<string, number> = {};
   for (const s of stageCounts) {
     countByStage[s.stage] = s._count;
@@ -180,6 +194,44 @@ export default async function DashboardPage() {
                 </Link>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {user.role === "AT" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Onboarding queue
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({onboardingInitiatives.length})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {onboardingInitiatives.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No initiatives in onboarding.</p>
+            ) : (
+              <div className="space-y-2">
+                {onboardingInitiatives.map((ini) => (
+                  <Link
+                    key={ini.id}
+                    href={`/initiatives/${ini.id}/onboarding`}
+                    className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{ini.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        AL: {ini.assignedAl?.name ?? "Unassigned"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                      {ini.grant?.onboardingStatus.replace("_", " ") ?? "No grant"}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
