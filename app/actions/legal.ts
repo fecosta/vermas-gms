@@ -1,0 +1,136 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/auth";
+import type { SessionUser } from "@/lib/auth";
+import { prisma } from "@/lib/db/client";
+import { assertCan } from "@/lib/authz";
+import { ChecklistItemSchema } from "@/lib/validations";
+import type { ChecklistItemStatus } from "@/app/generated/prisma/enums";
+
+type State = { errors?: Record<string, string[]>; message?: string } | null;
+
+export async function addChecklistItem(
+  caseId: string,
+  _prev: State,
+  formData: FormData
+): Promise<State> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "legal-dd:manage");
+
+  const parsed = ChecklistItemSchema.safeParse({
+    requiredDocName: formData.get("requiredDocName"),
+    description: formData.get("description") || undefined,
+    isRequired: formData.get("isRequired") ?? "true",
+  });
+
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors };
+  }
+
+  await prisma.legalChecklistItem.create({
+    data: {
+      caseId,
+      requiredDocName: parsed.data.requiredDocName,
+      description: parsed.data.description,
+      isRequired: parsed.data.isRequired,
+    },
+  });
+
+  revalidatePath(`/legal/${caseId}`);
+  return { message: "Item added." };
+}
+
+export async function updateChecklistItemStatus(
+  itemId: string,
+  status: ChecklistItemStatus
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "legal-dd:manage");
+
+  await prisma.legalChecklistItem.update({
+    where: { id: itemId },
+    data: { status, reviewedById: user.id, reviewedDate: new Date() },
+  });
+
+  const item = await prisma.legalChecklistItem.findUniqueOrThrow({
+    where: { id: itemId },
+    select: { caseId: true },
+  });
+
+  revalidatePath(`/legal/${item.caseId}`);
+  return {};
+}
+
+export async function validateWithTrust(caseId: string): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "legal-dd:manage");
+
+  await prisma.legalDueDiligenceCase.update({
+    where: { id: caseId },
+    data: { trustValidationStatus: "VALIDATED", status: "VALIDATED" },
+  });
+
+  const legalCase = await prisma.legalDueDiligenceCase.findUniqueOrThrow({
+    where: { id: caseId },
+    select: { initiativeId: true },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "LEGAL_STATUS_CHANGE",
+      entityType: "INITIATIVE",
+      entityId: legalCase.initiativeId,
+      after: { legalCaseStatus: "VALIDATED", trustValidation: "VALIDATED" },
+    },
+  });
+
+  revalidatePath(`/legal/${caseId}`);
+  revalidatePath(`/initiatives/${legalCase.initiativeId}`);
+  return {};
+}
+
+export async function completeLegalCase(caseId: string): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "legal-dd:complete");
+
+  const legalCase = await prisma.legalDueDiligenceCase.findUniqueOrThrow({
+    where: { id: caseId },
+    select: { initiativeId: true, status: true },
+  });
+
+  if (legalCase.status !== "VALIDATED") {
+    return { error: "Case must be validated with trust before completing." };
+  }
+
+  await prisma.legalDueDiligenceCase.update({
+    where: { id: caseId },
+    data: { status: "COMPLETE", completedDate: new Date() },
+  });
+
+  await prisma.initiative.update({
+    where: { id: legalCase.initiativeId },
+    data: { stage: "LEGAL_DD_COMPLETE", legalDdStatus: "COMPLETE" },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: "STAGE_CHANGE",
+      entityType: "INITIATIVE",
+      entityId: legalCase.initiativeId,
+      before: { stage: "LEGAL_DUE_DILIGENCE" },
+      after: { stage: "LEGAL_DD_COMPLETE" },
+    },
+  });
+
+  revalidatePath(`/legal/${caseId}`);
+  revalidatePath(`/legal`);
+  revalidatePath(`/initiatives/${legalCase.initiativeId}`);
+  return {};
+}

@@ -172,7 +172,80 @@ export async function moveInitiativeStage(
     return { error: result.reason };
   }
 
+  const fullInitiative = await prisma.initiative.findUniqueOrThrow({
+    where: { id },
+    select: { organizationId: true, assignedAlId: true },
+  });
+
   await prisma.initiative.update({ where: { id }, data: { stage: toStage } });
+
+  // Auto-provision dependent records on key stage entries
+  if (toStage === "APPLICATION_REVIEW" && fullInitiative.organizationId) {
+    const app = await prisma.application.upsert({
+      where: { initiativeId: id },
+      create: {
+        initiativeId: id,
+        organizationId: fullInitiative.organizationId,
+        alId: user.id,
+        status: "IN_REVIEW",
+      },
+      update: { status: "IN_REVIEW" },
+    });
+    await prisma.applicationReviewReport.upsert({
+      where: { applicationId: app.id },
+      create: { applicationId: app.id, status: "IN_PROGRESS" },
+      update: {},
+    });
+  }
+
+  if (toStage === "MEMO_DRAFTING") {
+    const app = await prisma.application.findUnique({ where: { initiativeId: id } });
+    if (app) {
+      const report = await prisma.applicationReviewReport.findUnique({
+        where: { applicationId: app.id },
+      });
+      if (report) {
+        await prisma.investmentMemo.upsert({
+          where: { reviewReportId: report.id },
+          create: { reviewReportId: report.id, authorAlId: user.id, reviewStatus: "DRAFT" },
+          update: {},
+        });
+      }
+    }
+  }
+
+  if (toStage === "LEGAL_DUE_DILIGENCE" && fullInitiative.organizationId) {
+    const firstAD = await prisma.user.findFirst({
+      where: { role: "AD", isActive: true },
+      select: { id: true },
+    });
+    if (firstAD) {
+      await prisma.legalDueDiligenceCase.upsert({
+        where: { initiativeId: id },
+        create: {
+          initiativeId: id,
+          organizationId: fullInitiative.organizationId,
+          adId: firstAD.id,
+          status: "DOCUMENTS_PENDING",
+        },
+        update: {},
+      });
+    }
+  }
+
+  if (toStage === "ONBOARDING" && fullInitiative.organizationId) {
+    await prisma.grant.upsert({
+      where: { initiativeId: id },
+      create: {
+        initiativeId: id,
+        organizationId: fullInitiative.organizationId,
+        areaLeadId: fullInitiative.assignedAlId,
+        status: "ACTIVE",
+        onboardingStatus: "IN_PROGRESS",
+      },
+      update: {},
+    });
+  }
 
   await prisma.auditLog.create({
     data: {

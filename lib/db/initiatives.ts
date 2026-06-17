@@ -40,6 +40,20 @@ export async function getInitiative(id: string) {
         include: { decidedBy: { select: { id: true, name: true } } },
         orderBy: { decidedAt: "desc" },
       },
+      application: {
+        include: {
+          reviewReport: {
+            include: {
+              memo: {
+                include: {
+                  peerReviews: { select: { id: true, status: true, reviewerId: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+      legalDdCase: { select: { id: true, status: true } },
     },
   });
 

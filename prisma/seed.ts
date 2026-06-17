@@ -178,6 +178,271 @@ async function main() {
   }
 
   // ----------------------------------------------------------------
+  // Workflow records — Applications, Memos, Legal DD, Grants
+  // (one block per later-stage initiative; all upserts are idempotent)
+  // ----------------------------------------------------------------
+  const past1 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const past2 = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+
+  // Helper: upsert PeerReview only if not already present
+  async function upsertPeerReview(id: string, memoId: string, reviewerId: string, status: "ASSIGNED" | "COMPLETE", reviewText?: string) {
+    const exists = await prisma.peerReview.findFirst({ where: { memoId, reviewerId } });
+    if (!exists) {
+      await prisma.peerReview.create({
+        data: {
+          id,
+          memoId,
+          reviewerId,
+          status,
+          assignedDate: past2,
+          ...(status === "COMPLETE" ? { completedDate: past1, reviewText: reviewText ?? "Review completed." } : {}),
+        },
+      });
+    }
+  }
+
+  // ---- init-5: APPLICATION_REVIEW (Voces Ciudadanas PE) ----
+  const app5 = await prisma.application.upsert({
+    where: { initiativeId: "init-5" },
+    update: {},
+    create: { id: "app-5", initiativeId: "init-5", organizationId: "org-voces", alId: "user-al-dem", status: "IN_REVIEW" },
+  });
+  await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app5.id },
+    update: {},
+    create: { id: "report-5", applicationId: app5.id, status: "IN_PROGRESS" },
+  });
+
+  // ---- init-6: MEMO_DRAFTING (Escuelas Digitales CO) ----
+  const app6 = await prisma.application.upsert({
+    where: { initiativeId: "init-6" },
+    update: {},
+    create: { id: "app-6", initiativeId: "init-6", organizationId: "org-edtech-co", alId: "user-al-edu", status: "COMPLETE" },
+  });
+  const report6 = await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app6.id },
+    update: {},
+    create: { id: "report-6", applicationId: app6.id, status: "KMD_SIGNED", alSignOffAt: past2, kmdReviewerId: "user-kmd", kmdSignOffAt: past1 },
+  });
+  await prisma.investmentMemo.upsert({
+    where: { reviewReportId: report6.id },
+    update: {},
+    create: {
+      id: "memo-6",
+      reviewReportId: report6.id,
+      authorAlId: "user-al-edu",
+      reviewStatus: "DRAFT",
+      body: "Escuelas Digitales CO proposes a scalable EdTech solution for rural schools in Colombia. Their evidence-based approach demonstrates strong alignment with our theory of change and thematic priorities in education access and quality.",
+    },
+  });
+
+  // ---- init-7: PEER_REVIEW (Participación Juvenil MX) ----
+  const app7 = await prisma.application.upsert({
+    where: { initiativeId: "init-7" },
+    update: {},
+    create: { id: "app-7", initiativeId: "init-7", organizationId: "org-democracia-ac", alId: "user-al-dem", status: "COMPLETE" },
+  });
+  const report7 = await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app7.id },
+    update: {},
+    create: { id: "report-7", applicationId: app7.id, status: "KMD_SIGNED", alSignOffAt: past2, kmdReviewerId: "user-kmd", kmdSignOffAt: past1 },
+  });
+  const memo7 = await prisma.investmentMemo.upsert({
+    where: { reviewReportId: report7.id },
+    update: {},
+    create: {
+      id: "memo-7",
+      reviewReportId: report7.id,
+      authorAlId: "user-al-dem",
+      reviewStatus: "IN_PEER_REVIEW",
+      body: "Participación Juvenil MX seeks to strengthen youth civic participation through digital tools and community organizing. The initiative has demonstrated results in two municipalities and has a credible scale-up plan.",
+    },
+  });
+  await upsertPeerReview("pr-7-1", memo7.id, "user-reviewer-1", "ASSIGNED");
+  await upsertPeerReview("pr-7-2", memo7.id, "user-reviewer-2", "ASSIGNED");
+
+  // ---- init-11: CEO_COMMITTEE_REVIEW (Elecciones Libres CO) ----
+  const app11 = await prisma.application.upsert({
+    where: { initiativeId: "init-11" },
+    update: {},
+    create: { id: "app-11", initiativeId: "init-11", organizationId: "org-democracia-ac", alId: "user-al-dem", status: "COMPLETE" },
+  });
+  const report11 = await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app11.id },
+    update: {},
+    create: { id: "report-11", applicationId: app11.id, status: "KMD_SIGNED", alSignOffAt: past2, kmdReviewerId: "user-kmd", kmdSignOffAt: past2 },
+  });
+  const memo11 = await prisma.investmentMemo.upsert({
+    where: { reviewReportId: report11.id },
+    update: {},
+    create: {
+      id: "memo-11",
+      reviewReportId: report11.id,
+      authorAlId: "user-al-dem",
+      reviewStatus: "IN_CEO_REVIEW",
+      body: "Elecciones Libres CO works to strengthen electoral integrity through parallel vote tabulation and civic education. The organization has a 10-year track record and operates in 6 departments.",
+    },
+  });
+  await upsertPeerReview("pr-11-1", memo11.id, "user-reviewer-1", "COMPLETE", "Strong strategic alignment. The team has deep expertise in electoral observation and has built trusted relationships with civil society. I recommend approval with standard reporting requirements.");
+  await upsertPeerReview("pr-11-2", memo11.id, "user-reviewer-2", "COMPLETE", "Solid financial management demonstrated in past audits. Geographic expansion plan is credible. Some concerns about dependency on key staff — recommend requesting a succession plan.");
+
+  // ---- init-8: LEGAL_DUE_DILIGENCE (Alfabetización Digital AR) ----
+  const app8 = await prisma.application.upsert({
+    where: { initiativeId: "init-8" },
+    update: {},
+    create: { id: "app-8", initiativeId: "init-8", organizationId: "org-fundacion-leer", alId: "user-al-edu", status: "COMPLETE" },
+  });
+  const report8 = await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app8.id },
+    update: {},
+    create: { id: "report-8", applicationId: app8.id, status: "KMD_SIGNED", alSignOffAt: past2, kmdReviewerId: "user-kmd", kmdSignOffAt: past2 },
+  });
+  const memo8 = await prisma.investmentMemo.upsert({
+    where: { reviewReportId: report8.id },
+    update: {},
+    create: {
+      id: "memo-8",
+      reviewReportId: report8.id,
+      authorAlId: "user-al-edu",
+      reviewStatus: "IN_CEO_REVIEW",
+      body: "Alfabetización Digital AR combines literacy and digital skills training for adults in vulnerable communities. Strong evidence base from a 3-year pilot with 12,000 beneficiaries.",
+    },
+  });
+  await upsertPeerReview("pr-8-1", memo8.id, "user-reviewer-1", "COMPLETE", "Compelling impact evidence. The combination of literacy and digital access is differentiated and needed. I support moving forward.");
+  await upsertPeerReview("pr-8-2", memo8.id, "user-reviewer-2", "COMPLETE", "Well-documented approach. Governance structure is sound. Recommend approval.");
+  const legalCase8 = await prisma.legalDueDiligenceCase.upsert({
+    where: { initiativeId: "init-8" },
+    update: {},
+    create: { id: "case-8", initiativeId: "init-8", organizationId: "org-fundacion-leer", adId: "user-ad", status: "DOCUMENTS_PENDING" },
+  });
+  for (const item of [
+    { id: "cli-8-1", requiredDocName: "Certificate of incorporation", isRequired: true, status: "ACCEPTED" as const },
+    { id: "cli-8-2", requiredDocName: "Latest annual financial report", isRequired: true, status: "PENDING" as const },
+    { id: "cli-8-3", requiredDocName: "Board member declarations", isRequired: true, status: "SUBMITTED" as const },
+  ]) {
+    await prisma.legalChecklistItem.upsert({
+      where: { id: item.id },
+      update: {},
+      create: { ...item, caseId: legalCase8.id },
+    });
+  }
+
+  // ---- init-9: ONBOARDING (Democracia Participativa BR) ----
+  const app9 = await prisma.application.upsert({
+    where: { initiativeId: "init-9" },
+    update: {},
+    create: { id: "app-9", initiativeId: "init-9", organizationId: "org-civic-br", alId: "user-al-dem", status: "COMPLETE" },
+  });
+  const report9 = await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app9.id },
+    update: {},
+    create: { id: "report-9", applicationId: app9.id, status: "KMD_SIGNED", alSignOffAt: past2, kmdReviewerId: "user-kmd", kmdSignOffAt: past2 },
+  });
+  const memo9 = await prisma.investmentMemo.upsert({
+    where: { reviewReportId: report9.id },
+    update: {},
+    create: {
+      id: "memo-9",
+      reviewReportId: report9.id,
+      authorAlId: "user-al-dem",
+      reviewStatus: "IN_CEO_REVIEW",
+      body: "Democracia Participativa BR supports participatory budgeting processes in Brazilian municipalities. Their model has been adopted by 14 cities and the team has strong institutional ties.",
+    },
+  });
+  await upsertPeerReview("pr-9-1", memo9.id, "user-reviewer-1", "COMPLETE", "High-quality, context-sensitive model with demonstrated policy uptake. Strong recommendation.");
+  await upsertPeerReview("pr-9-2", memo9.id, "user-reviewer-2", "COMPLETE", "Excellent track record. Financial controls are robust. I strongly support this grant.");
+  await prisma.legalDueDiligenceCase.upsert({
+    where: { initiativeId: "init-9" },
+    update: {},
+    create: { id: "case-9", initiativeId: "init-9", organizationId: "org-civic-br", adId: "user-ad", status: "COMPLETE", completedDate: past1 },
+  });
+  const grant9 = await prisma.grant.upsert({
+    where: { initiativeId: "init-9" },
+    update: {},
+    create: {
+      id: "grant-9",
+      initiativeId: "init-9",
+      organizationId: "org-civic-br",
+      areaLeadId: "user-al-dem",
+      status: "ACTIVE",
+      onboardingStatus: "IN_PROGRESS",
+      amount: 150000,
+      currency: "USD",
+      supportType: ["MEL", "STRATEGIC"],
+      reportingCadence: "Quarterly",
+      scope: "Expand participatory budgeting to 5 additional municipalities in Minas Gerais.",
+    },
+  });
+  for (const kpi of [
+    { id: "kpi-9-1", name: "Municipalities using PB", target: "5 new", cadence: "Annual" },
+    { id: "kpi-9-2", name: "Citizens engaged in PB process", target: "25,000", cadence: "Annual" },
+  ]) {
+    await prisma.kPI.upsert({
+      where: { id: kpi.id },
+      update: {},
+      create: { ...kpi, grantId: grant9.id },
+    });
+  }
+
+  // ---- init-10: ACTIVE (Competencias Siglo XXI PE) ----
+  const app10 = await prisma.application.upsert({
+    where: { initiativeId: "init-10" },
+    update: {},
+    create: { id: "app-10", initiativeId: "init-10", organizationId: "org-voces", alId: "user-al-edu", status: "COMPLETE" },
+  });
+  const report10 = await prisma.applicationReviewReport.upsert({
+    where: { applicationId: app10.id },
+    update: {},
+    create: { id: "report-10", applicationId: app10.id, status: "KMD_SIGNED", alSignOffAt: past2, kmdReviewerId: "user-kmd", kmdSignOffAt: past2 },
+  });
+  const memo10 = await prisma.investmentMemo.upsert({
+    where: { reviewReportId: report10.id },
+    update: {},
+    create: {
+      id: "memo-10",
+      reviewReportId: report10.id,
+      authorAlId: "user-al-edu",
+      reviewStatus: "IN_CEO_REVIEW",
+      body: "Competencias Siglo XXI PE integrates 21st-century skills into the Peruvian public school curriculum. Partnership with MoE provides sustainability and systemic reach.",
+    },
+  });
+  await upsertPeerReview("pr-10-1", memo10.id, "user-reviewer-1", "COMPLETE", "Transformative potential with government partnership ensuring sustainability. Clear recommendation to approve.");
+  await upsertPeerReview("pr-10-2", memo10.id, "user-reviewer-2", "COMPLETE", "Strong systems change approach. Financial controls are solid. Recommend approval.");
+  await prisma.legalDueDiligenceCase.upsert({
+    where: { initiativeId: "init-10" },
+    update: {},
+    create: { id: "case-10", initiativeId: "init-10", organizationId: "org-voces", adId: "user-ad", status: "COMPLETE", completedDate: past2 },
+  });
+  const grant10 = await prisma.grant.upsert({
+    where: { initiativeId: "init-10" },
+    update: {},
+    create: {
+      id: "grant-10",
+      initiativeId: "init-10",
+      organizationId: "org-voces",
+      areaLeadId: "user-al-edu",
+      status: "ACTIVE",
+      onboardingStatus: "COMPLETED",
+      amount: 200000,
+      currency: "USD",
+      supportType: ["MEL", "TECH", "STRATEGIC"],
+      reportingCadence: "Semi-annual",
+      scope: "Integrate 21st-century skills into 500 public schools across Peru over 3 years.",
+    },
+  });
+  for (const kpi of [
+    { id: "kpi-10-1", name: "Schools with curriculum integration", target: "500", cadence: "Annual" },
+    { id: "kpi-10-2", name: "Teachers trained", target: "2,000", cadence: "Annual" },
+    { id: "kpi-10-3", name: "Students reached", target: "120,000", cadence: "Annual" },
+  ]) {
+    await prisma.kPI.upsert({
+      where: { id: kpi.id },
+      update: {},
+      create: { ...kpi, grantId: grant10.id },
+    });
+  }
+
+  // ----------------------------------------------------------------
   // Print credentials
   // ----------------------------------------------------------------
   console.log("✅ Seed complete!\n");

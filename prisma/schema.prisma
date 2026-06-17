@@ -439,6 +439,7 @@ model InvestmentMemo {
   reviewReportId String     @unique
   authorAlId     String
   reviewStatus   MemoStatus @default(DRAFT)
+  body           String?
   ceoQuestions   String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -453,6 +454,7 @@ model PeerReview {
   memoId        String
   reviewerId    String
   status        PeerReviewStatus @default(NOT_ASSIGNED)
+  reviewText    String?
   assignedDate  DateTime
   completedDate DateTime?
   createdAt     DateTime         @default(now())

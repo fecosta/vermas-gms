@@ -49,3 +49,54 @@ export const InitiativeSchema = z.object({
   scopingCallDate: z.coerce.date().optional(),
 });
 export type InitiativeInput = z.infer<typeof InitiativeSchema>;
+
+export const DecisionSchema = z.object({
+  type: z.enum(["CONCEPT", "MEMO", "STRATEGY"]),
+  decision: z.enum([
+    "APPROVED",
+    "REJECTED",
+    "REVISION_REQUESTED",
+    "CONDITIONALLY_APPROVED",
+    "DEFERRED",
+  ]),
+  rationale: z.string().max(5000).optional(),
+  conditions: z.string().max(2000).optional(),
+});
+export type DecisionInput = z.infer<typeof DecisionSchema>;
+
+export const ReviewNoteSchema = z.object({
+  protocolNotes: z.string().max(5000).optional(),
+  reviewComments: z.string().max(5000).optional(),
+});
+export type ReviewNoteInput = z.infer<typeof ReviewNoteSchema>;
+
+export const PeerReviewSchema = z.object({
+  reviewText: z.string().min(1, "Review text is required").max(10000),
+});
+export type PeerReviewInput = z.infer<typeof PeerReviewSchema>;
+
+export const ChecklistItemSchema = z.object({
+  requiredDocName: z.string().min(1, "Document name is required").max(200),
+  description: z.string().max(500).optional(),
+  isRequired: z.coerce.boolean().default(true),
+});
+export type ChecklistItemInput = z.infer<typeof ChecklistItemSchema>;
+
+export const GrantSchema = z.object({
+  amount: z.coerce.number().min(0).optional(),
+  currency: z.string().max(10).optional(),
+  reportingCadence: z.string().max(200).optional(),
+  nextReportDue: z.coerce.date().optional(),
+  scope: z.string().max(5000).optional(),
+  reportingConditions: z.string().max(5000).optional(),
+  supportType: z.array(z.enum(["MEL", "TECH", "STRATEGIC"])).default([]),
+});
+export type GrantInput = z.infer<typeof GrantSchema>;
+
+export const KPISchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  description: z.string().max(500).optional(),
+  target: z.string().max(200).optional(),
+  cadence: z.string().max(200).optional(),
+});
+export type KPIInput = z.infer<typeof KPISchema>;

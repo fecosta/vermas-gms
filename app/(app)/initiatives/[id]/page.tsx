@@ -43,6 +43,25 @@ export default async function InitiativeDetailPage({ params }: Props) {
   const lastMemoDecision =
     initiative.decisions.find((d) => d.type === "MEMO")?.decision ?? null;
 
+  const reviewReport = initiative.application?.reviewReport ?? null;
+  const peerReviews = reviewReport?.memo?.peerReviews ?? [];
+  const legalCase = initiative.legalDdCase ?? null;
+
+  const stageActionLink: Record<string, string> = {
+    CONCEPT_REVIEW: `./concept-review`,
+    CONCEPT_DECISION: `./concept-review`,
+    APPLICATION_REVIEW: `./application-review`,
+    MEMO_DRAFTING: `./memo`,
+    PEER_REVIEW: `./memo`,
+    CEO_COMMITTEE_REVIEW: `./memo`,
+    ONBOARDING: `./onboarding`,
+    ...(legalCase ? {
+      LEGAL_DUE_DILIGENCE: `/legal/${legalCase.id}`,
+      LEGAL_DD_COMPLETE: `/legal/${legalCase.id}`,
+    } : {}),
+  };
+  const subPageLink = stageActionLink[initiative.stage];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -64,11 +83,31 @@ export default async function InitiativeDetailPage({ params }: Props) {
                 assignedAlId: initiative.assignedAlId,
               }}
               user={user}
-              context={{ lastConceptDecision, lastMemoDecision }}
+              context={{
+                lastConceptDecision,
+                lastMemoDecision,
+                reviewReportStatus: reviewReport?.status ?? null,
+                legalDdCaseStatus: legalCase?.status ?? null,
+                peerReviewerNominated: peerReviews.length >= 2,
+                peerReviewsComplete:
+                  peerReviews.length >= 2 &&
+                  peerReviews.every((pr) => pr.status === "COMPLETE"),
+              }}
             />
           </div>
         }
       />
+
+      {subPageLink && (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            This initiative is in a stage with a dedicated workflow view.
+          </p>
+          <Button size="sm" variant="outline" render={<Link href={subPageLink} />}>
+            Open workflow →
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* Main details */}
