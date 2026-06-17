@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { BellIcon } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 
 type NavItem = { href: string; label: string };
@@ -20,7 +21,7 @@ function navItemsForRole(role: SessionUser["role"]): NavItem[] {
     case "CEO":
       return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }];
     case "KMD":
-      return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }];
+      return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }, { href: "/criteria", label: "Criteria" }];
     case "AL":
     case "AT":
       return [...base, ...pipeline];
@@ -31,13 +32,13 @@ function navItemsForRole(role: SessionUser["role"]): NavItem[] {
     case "PEER_REVIEWER":
       return [{ href: "/dashboard", label: "Dashboard" }, { href: "/reviews", label: "My reviews" }];
     case "ADMIN":
-      return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }, { href: "/admin", label: "Admin" }];
+      return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }, { href: "/criteria", label: "Criteria" }, { href: "/admin", label: "Admin" }];
     default:
       return base;
   }
 }
 
-export function Nav({ user }: { user: SessionUser }) {
+export function Nav({ user, unreadCount }: { user: SessionUser; unreadCount?: number }) {
   const pathname = usePathname();
   const items = navItemsForRole(user.role);
 
@@ -68,6 +69,17 @@ export function Nav({ user }: { user: SessionUser }) {
           <span className="text-xs text-muted-foreground hidden sm:block">
             {user.name} · {user.role.replace("_", " ")}
           </span>
+          <Link
+            href="/notifications"
+            className="relative rounded-md p-1.5 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <BellIcon className="size-4" />
+            {unreadCount && unreadCount > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            ) : null}
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"

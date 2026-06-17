@@ -101,6 +101,30 @@ export const KPISchema = z.object({
 });
 export type KPIInput = z.infer<typeof KPISchema>;
 
+export const MeetingSchema = z.object({
+  type: z.enum(["CONCEPT_REVIEW", "MEMO_REVIEW", "KICKOFF"]),
+  title: z.string().min(1, "Title is required").max(200),
+  dateTime: z.coerce.date(),
+  externalParticipants: z.string().max(500).optional(),
+  agenda: z.string().max(5000).optional(),
+  minutes: z.string().max(10000).optional(),
+  decisions: z.string().max(5000).optional(),
+});
+export type MeetingInput = z.infer<typeof MeetingSchema>;
+
+export const CriteriaSetSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  description: z.string().max(2000).optional(),
+});
+export type CriteriaSetInput = z.infer<typeof CriteriaSetSchema>;
+
+export const CriteriaItemSchema = z.object({
+  label: z.string().min(1, "Label is required").max(500),
+  guidance: z.string().max(2000).optional(),
+  order: z.coerce.number().int().default(0),
+});
+export type CriteriaItemInput = z.infer<typeof CriteriaItemSchema>;
+
 export const StrategyDocSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   type: z.enum([

@@ -1,7 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateChecklistItemStatus } from "@/app/actions/legal";
+import { updateChecklistItemStatus, requestRevision, resolveRevision } from "@/app/actions/legal";
 import type { ChecklistItemStatus } from "@/app/generated/prisma/enums";
 import type { LegalCaseDetail } from "@/lib/db/legal";
 
@@ -38,10 +39,30 @@ interface ChecklistTableProps {
 
 function ChecklistRow({ item, isAD }: { item: ChecklistItem; isAD: boolean }) {
   const [isPending, startTransition] = useTransition();
+  const [showRevisionForm, setShowRevisionForm] = useState(false);
+  const [revisionNotes, setRevisionNotes] = useState("");
+
+  const openRevision = item.revisions[0]?.resolvedAt === null ? item.revisions[0] : null;
 
   const handleStatusChange = (status: ChecklistItemStatus) => {
     startTransition(async () => {
       await updateChecklistItemStatus(item.id, status);
+    });
+  };
+
+  const handleRequestRevision = () => {
+    startTransition(async () => {
+      const result = await requestRevision(item.id, revisionNotes);
+      if (!result?.error) {
+        setShowRevisionForm(false);
+        setRevisionNotes("");
+      }
+    });
+  };
+
+  const handleResolveRevision = (revisionId: string) => {
+    startTransition(async () => {
+      await resolveRevision(revisionId);
     });
   };
 
@@ -52,20 +73,76 @@ function ChecklistRow({ item, isAD }: { item: ChecklistItem; isAD: boolean }) {
         {item.description && (
           <div className="text-xs text-muted-foreground mt-0.5">{item.description}</div>
         )}
-        {item.revisions[0] && (
+        {openRevision && (
           <div className="text-xs text-orange-600 mt-0.5">
-            Revision requested: {item.revisions[0].notes}
+            Revision requested: {openRevision.notes}
+          </div>
+        )}
+        {isAD && (
+          <div className="mt-1.5 space-y-1.5">
+            {openRevision ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs text-green-700 hover:text-green-800 px-0"
+                disabled={isPending}
+                onClick={() => handleResolveRevision(openRevision.id)}
+              >
+                Mark resolved
+              </Button>
+            ) : showRevisionForm ? (
+              <div className="space-y-1.5">
+                <Textarea
+                  value={revisionNotes}
+                  onChange={(e) => setRevisionNotes(e.target.value)}
+                  placeholder="Describe what needs to be revised…"
+                  rows={2}
+                  className="text-xs"
+                />
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-6 text-xs"
+                    disabled={isPending || !revisionNotes.trim()}
+                    onClick={handleRequestRevision}
+                  >
+                    Submit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => { setShowRevisionForm(false); setRevisionNotes(""); }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs text-orange-600 hover:text-orange-700 px-0"
+                onClick={() => setShowRevisionForm(true)}
+              >
+                Request revision
+              </Button>
+            )}
           </div>
         )}
       </td>
-      <td className="py-3 pr-4 text-center">
+      <td className="py-3 pr-4 text-center align-top pt-3">
         {item.isRequired ? (
           <span className="text-xs font-medium text-red-600">Required</span>
         ) : (
           <span className="text-xs text-muted-foreground">Optional</span>
         )}
       </td>
-      <td className="py-3 pr-4">
+      <td className="py-3 pr-4 align-top pt-3">
         {isAD ? (
           <Select
             value={item.status}
@@ -89,7 +166,7 @@ function ChecklistRow({ item, isAD }: { item: ChecklistItem; isAD: boolean }) {
           </span>
         )}
       </td>
-      <td className="py-3 text-xs text-muted-foreground">
+      <td className="py-3 text-xs text-muted-foreground align-top pt-3">
         {item.reviewedBy?.name}
         {item.reviewedDate && (
           <span className="ml-1">({new Date(item.reviewedDate).toLocaleDateString()})</span>

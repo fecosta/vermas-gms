@@ -134,3 +134,51 @@ export async function completeLegalCase(caseId: string): Promise<{ error?: strin
   revalidatePath(`/initiatives/${legalCase.initiativeId}`);
   return {};
 }
+
+export async function requestRevision(
+  checklistItemId: string,
+  notes: string
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "legal-dd:manage");
+
+  if (!notes.trim()) {
+    return { error: "Notes are required." };
+  }
+
+  const item = await prisma.legalChecklistItem.findUniqueOrThrow({
+    where: { id: checklistItemId },
+    select: { caseId: true },
+  });
+
+  await prisma.$transaction([
+    prisma.revisionRequest.create({
+      data: { caseId: item.caseId, checklistItemId, notes: notes.trim(), requestedById: user.id },
+    }),
+    prisma.legalChecklistItem.update({
+      where: { id: checklistItemId },
+      data: { status: "REVISION_REQUESTED" },
+    }),
+  ]);
+
+  revalidatePath(`/legal/${item.caseId}`);
+  return {};
+}
+
+export async function resolveRevision(
+  revisionId: string
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "legal-dd:manage");
+
+  const revision = await prisma.revisionRequest.update({
+    where: { id: revisionId },
+    data: { resolvedAt: new Date() },
+    select: { caseId: true },
+  });
+
+  revalidatePath(`/legal/${revision.caseId}`);
+  return {};
+}

@@ -9,18 +9,19 @@ import { PeerReviewSchema } from "@/lib/validations";
 
 type State = { errors?: Record<string, string[]>; message?: string } | null;
 
-async function getInitiativeIdForMemo(memoId: string): Promise<{ initiativeId: string; assignedAlId: string }> {
+async function getInitiativeIdForMemo(memoId: string): Promise<{ initiativeId: string; assignedAlId: string; initiativeName: string }> {
   const memo = await prisma.investmentMemo.findUniqueOrThrow({
     where: { id: memoId },
     include: {
       reviewReport: {
-        include: { application: { select: { initiativeId: true, initiative: { select: { assignedAlId: true } } } } },
+        include: { application: { select: { initiativeId: true, initiative: { select: { assignedAlId: true, name: true } } } } },
       },
     },
   });
   return {
     initiativeId: memo.reviewReport.application.initiativeId,
     assignedAlId: memo.reviewReport.application.initiative.assignedAlId,
+    initiativeName: memo.reviewReport.application.initiative.name,
   };
 }
 
@@ -59,7 +60,7 @@ export async function nominatePeerReviewers(
   const session = await auth();
   const user = session!.user as unknown as SessionUser;
 
-  const { initiativeId, assignedAlId } = await getInitiativeIdForMemo(memoId);
+  const { initiativeId, assignedAlId, initiativeName } = await getInitiativeIdForMemo(memoId);
 
   assertCan(user, "peer-review:nominate", {
     type: "initiative",
@@ -102,6 +103,18 @@ export async function nominatePeerReviewers(
       after: { peerReviewersNominated: [reviewer1Id, reviewer2Id] },
     },
   });
+
+  for (const reviewerId of [reviewer1Id, reviewer2Id]) {
+    await prisma.notification.create({
+      data: {
+        userId: reviewerId,
+        type: "PEER_REVIEWER_ASSIGNED",
+        message: `You have been assigned to peer review "${initiativeName}"`,
+        relatedType: "INITIATIVE",
+        relatedId: initiativeId,
+      },
+    });
+  }
 
   revalidatePath(`/initiatives/${initiativeId}/memo`);
   revalidatePath(`/initiatives/${initiativeId}`);

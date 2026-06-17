@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { getInitiative } from "@/lib/db/initiatives";
 import { getComments } from "@/lib/db/comments";
+import { getMeetings } from "@/lib/db/meetings";
+import { CreateMeetingDialog } from "@/components/meetings/create-meeting-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { AuditLogTable } from "@/components/shared/audit-log-table";
@@ -36,8 +38,12 @@ export default async function InitiativeDetailPage({ params }: Props) {
 
   const { initiative, auditLogs } = data;
 
-  const comments = await getComments("INITIATIVE" as CommentRelatedType, id);
+  const [comments, meetings] = await Promise.all([
+    getComments("INITIATIVE" as CommentRelatedType, id),
+    getMeetings(id),
+  ]);
   const canComment = can(user, "comment:create");
+  const canLogMeeting = can(user, "meeting:create");
   const canViewInternal = can(user, "comment:view-internal");
   const boundAddComment = addComment.bind(null, "INITIATIVE" as CommentRelatedType, id);
 
@@ -318,6 +324,42 @@ export default async function InitiativeDetailPage({ params }: Props) {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Meetings</CardTitle>
+              {canLogMeeting && <CreateMeetingDialog initiativeId={id} />}
+            </CardHeader>
+            <CardContent>
+              {meetings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No meetings recorded.</p>
+              ) : (
+                <div className="divide-y">
+                  {meetings.map((m) => (
+                    <div key={m.id} className="py-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {m.type.replace("_", " ")}
+                        </Badge>
+                        <span className="font-medium">{m.title}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(m.dateTime).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {m.externalParticipants && ` · ${m.externalParticipants}`}
+                      </p>
+                      {m.decisions && (
+                        <p className="text-xs mt-1 text-muted-foreground line-clamp-2">{m.decisions}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

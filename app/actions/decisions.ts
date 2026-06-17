@@ -35,7 +35,7 @@ export async function recordDecision(
 
   const initiative = await prisma.initiative.findUniqueOrThrow({
     where: { id: initiativeId },
-    select: { id: true, stage: true },
+    select: { id: true, stage: true, assignedAlId: true, name: true },
   });
 
   await prisma.decision.create({
@@ -74,6 +74,16 @@ export async function recordDecision(
         entityId: initiativeId,
         before: { stage: initiative.stage },
         after: { stage: nextStage },
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: initiative.assignedAlId,
+        type: "CEO_DECISION_RECORDED",
+        message: `CEO recorded a decision on "${initiative.name}"`,
+        relatedType: "INITIATIVE",
+        relatedId: initiativeId,
       },
     });
   }
