@@ -9,6 +9,7 @@ import { CreateMeetingDialog } from "@/components/meetings/create-meeting-dialog
 import { CriteriaAssignment } from "@/components/initiatives/criteria-assignment";
 import { ContactAssignment } from "@/components/initiatives/contact-assignment";
 import { SupportingAtAssignment } from "@/components/initiatives/supporting-at-assignment";
+import { MeetingParticipantsSection } from "@/components/initiatives/meeting-participants-section";
 import { prisma } from "@/lib/db/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
@@ -42,7 +43,7 @@ export default async function InitiativeDetailPage({ params }: Props) {
 
   const { initiative, auditLogs } = data;
 
-  const [comments, meetings, criteriaSets, allContacts, atUsers] = await Promise.all([
+  const [comments, meetings, criteriaSets, allContacts, atUsers, allUsers] = await Promise.all([
     getComments("INITIATIVE" as CommentRelatedType, id),
     getMeetings(id),
     prisma.criteriaSet.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -55,9 +56,15 @@ export default async function InitiativeDetailPage({ params }: Props) {
       orderBy: { name: "asc" },
       select: { id: true, name: true, role: true },
     }),
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
   const canComment = can(user, "comment:create");
   const canLogMeeting = can(user, "meeting:create");
+  const canManageParticipants = can(user, "meeting:select-participants");
   const canViewInternal = can(user, "comment:view-internal");
   const boundAddComment = addComment.bind(null, "INITIATIVE" as CommentRelatedType, id);
 
@@ -84,6 +91,7 @@ export default async function InitiativeDetailPage({ params }: Props) {
     PEER_REVIEW: `./memo`,
     CEO_COMMITTEE_REVIEW: `./memo`,
     ONBOARDING: `./onboarding`,
+    ACTIVE: `./active`,
     ...(legalCase ? {
       LEGAL_DUE_DILIGENCE: `/legal/${legalCase.id}`,
       LEGAL_DD_COMPLETE: `/legal/${legalCase.id}`,
@@ -416,6 +424,12 @@ export default async function InitiativeDetailPage({ params }: Props) {
                       {m.decisions && (
                         <p className="text-xs mt-1 text-muted-foreground line-clamp-2">{m.decisions}</p>
                       )}
+                      <MeetingParticipantsSection
+                        meetingId={m.id}
+                        participants={m.participants}
+                        allUsers={allUsers}
+                        canManage={canManageParticipants}
+                      />
                     </div>
                   ))}
                 </div>

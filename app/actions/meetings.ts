@@ -76,3 +76,41 @@ export async function updateMeeting(
   revalidatePath(`/initiatives/${meeting.initiativeId}`);
   return { message: "Meeting updated." };
 }
+
+export async function addMeetingParticipant(
+  meetingId: string,
+  userId: string
+): Promise<void> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "meeting:select-participants");
+
+  const meeting = await prisma.meeting.findUniqueOrThrow({
+    where: { id: meetingId },
+    select: { initiativeId: true },
+  });
+
+  await prisma.meetingParticipant.create({ data: { meetingId, userId } });
+
+  revalidatePath(`/initiatives/${meeting.initiativeId}`);
+}
+
+export async function removeMeetingParticipant(
+  meetingId: string,
+  userId: string
+): Promise<void> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "meeting:select-participants");
+
+  const meeting = await prisma.meeting.findUniqueOrThrow({
+    where: { id: meetingId },
+    select: { initiativeId: true },
+  });
+
+  await prisma.meetingParticipant.delete({
+    where: { meetingId_userId: { meetingId, userId } },
+  });
+
+  revalidatePath(`/initiatives/${meeting.initiativeId}`);
+}

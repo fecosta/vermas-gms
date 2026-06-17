@@ -6,6 +6,7 @@ import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { assertCan } from "@/lib/authz";
 import { GrantSchema, KPISchema } from "@/lib/validations";
+import type { GrantStatus } from "@/app/generated/prisma/enums";
 
 export type GrantFormState = {
   errors?: Record<string, string[]>;
@@ -151,5 +152,23 @@ export async function completeOnboarding(
   revalidatePath(`/initiatives/${initiativeId}/onboarding`);
   revalidatePath(`/initiatives/${initiativeId}`);
   revalidatePath("/initiatives");
+  return {};
+}
+
+export async function updateGrantStatus(
+  initiativeId: string,
+  status: GrantStatus
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "grant:edit");
+
+  await prisma.grant.update({
+    where: { initiativeId },
+    data: { status },
+  });
+
+  revalidatePath(`/initiatives/${initiativeId}/active`);
+  revalidatePath(`/initiatives/${initiativeId}`);
   return {};
 }

@@ -105,6 +105,21 @@ export default async function DashboardPage() {
       : Promise.resolve([] as { id: string; title: string; status: string }[]),
   ]);
 
+  const activeInitiatives = await prisma.initiative.findMany({
+    where: {
+      stage: "ACTIVE",
+      ...(user.role === "AL" ? { assignedAlId: user.id } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      assignedAl: { select: { name: true } },
+      grant: { select: { status: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 10,
+  });
+
   const onboardingInitiatives =
     user.role === "AT"
       ? await prisma.initiative.findMany({
@@ -190,6 +205,51 @@ export default async function DashboardPage() {
                   <span className="text-sm truncate mr-2">{c.initiative.name}</span>
                   <Badge variant="outline" className="text-xs shrink-0">
                     {CASE_STATUS_LABELS[c.status] ?? c.status}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeInitiatives.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Active portfolio
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({activeInitiatives.length})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {activeInitiatives.map((i) => (
+                <Link
+                  key={i.id}
+                  href={`/initiatives/${i.id}/active`}
+                  className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
+                >
+                  <div>
+                    <p className="text-sm truncate mr-2">{i.name}</p>
+                    {user.role !== "AL" && (
+                      <p className="text-xs text-muted-foreground">
+                        AL: {i.assignedAl?.name ?? "—"}
+                      </p>
+                    )}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs shrink-0 ${
+                      i.grant?.status === "PAUSED"
+                        ? "border-amber-300 text-amber-700"
+                        : i.grant?.status === "CLOSED"
+                        ? "text-muted-foreground"
+                        : ""
+                    }`}
+                  >
+                    {i.grant?.status ?? "No grant"}
                   </Badge>
                 </Link>
               ))}
