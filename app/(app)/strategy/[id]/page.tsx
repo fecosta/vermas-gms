@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { StrategyDocForm } from "@/components/strategy/strategy-doc-form";
 import { SubmitForReviewButton } from "@/components/strategy/submit-for-review-button";
 import { ApproveButton } from "@/components/strategy/approve-button";
+import { RejectStrategyDocButton } from "@/components/strategy/reject-strategy-doc-button";
 import { updateStrategyDoc } from "@/app/actions/strategy";
 import { ChevronLeftIcon } from "lucide-react";
 
@@ -82,6 +83,7 @@ export default async function StrategyDocPage({ params }: Props) {
                 {doc.status.replace("_", " ")}
               </Badge>
               {canSubmit && <SubmitForReviewButton docId={id} />}
+              {canApprove && <RejectStrategyDocButton docId={id} />}
               {canApprove && <ApproveButton docId={id} />}
             </div>
           }

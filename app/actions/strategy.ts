@@ -149,3 +149,29 @@ export async function approveStrategyDoc(
   revalidatePath("/strategy");
   return {};
 }
+
+export async function rejectStrategyDoc(
+  docId: string
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  assertCan(user, "strategy:approve");
+
+  const doc = await prisma.strategyDocument.findUniqueOrThrow({
+    where: { id: docId },
+    select: { status: true },
+  });
+
+  if (doc.status !== "IN_REVIEW") {
+    return { error: "Only IN_REVIEW documents can be sent back to draft." };
+  }
+
+  await prisma.strategyDocument.update({
+    where: { id: docId },
+    data: { status: "DRAFT", approvedById: null, approvalDate: null },
+  });
+
+  revalidatePath(`/strategy/${docId}`);
+  revalidatePath("/strategy");
+  return {};
+}

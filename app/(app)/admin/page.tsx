@@ -40,6 +40,9 @@ export default async function AdminPage() {
             <Button variant="outline" size="sm" render={<Link href="/admin/areas" />}>
               Manage areas
             </Button>
+            <Button variant="outline" size="sm" render={<Link href="/admin/audit-log" />}>
+              View audit log
+            </Button>
             <InviteUserDialog areas={areas} />
           </div>
         }

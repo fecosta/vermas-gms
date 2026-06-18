@@ -372,7 +372,7 @@ export default async function DashboardPage() {
                     href={
                       i.stage === "CONCEPT_REVIEW"
                         ? `/initiatives/${i.id}/concept-review`
-                        : `/initiatives/${i.id}`
+                        : `/initiatives/${i.id}/memo`
                     }
                     className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
                   >
