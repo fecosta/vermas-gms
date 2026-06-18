@@ -60,6 +60,27 @@ export async function updateChecklistItemStatus(
     select: { caseId: true },
   });
 
+  if (status === "SUBMITTED") {
+    const caseData = await prisma.legalDueDiligenceCase.findUniqueOrThrow({
+      where: { id: item.caseId },
+      select: {
+        initiativeId: true,
+        initiative: { select: { assignedAlId: true, name: true } },
+      },
+    });
+    if (caseData.initiative.assignedAlId) {
+      await prisma.notification.create({
+        data: {
+          userId: caseData.initiative.assignedAlId,
+          type: "LEGAL_DOCUMENT_UPLOADED",
+          message: `A legal document was uploaded for "${caseData.initiative.name}"`,
+          relatedType: "INITIATIVE",
+          relatedId: caseData.initiativeId,
+        },
+      });
+    }
+  }
+
   revalidatePath(`/legal/${item.caseId}`);
   return {};
 }

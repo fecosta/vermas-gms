@@ -85,6 +85,11 @@ export default async function InitiativeDetailPage({ params }: Props) {
   const legalCase = initiative.legalDdCase ?? null;
 
   const stageActionLink: Record<string, string> = {
+    SOURCED: `./scoping`,
+    SCOPING: `./scoping`,
+    SCREENING_MATERIALS_REQUESTED: `./scoping`,
+    APPLICATION_REQUESTED: `./application-request`,
+    APPLICATION_RECEIVED: `./application-request`,
     CONCEPT_REVIEW: `./concept-review`,
     CONCEPT_DECISION: `./concept-review`,
     APPLICATION_REVIEW: `./application-review`,
