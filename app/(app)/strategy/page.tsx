@@ -6,16 +6,9 @@ import { can } from "@/lib/authz";
 import { getStrategyDocs } from "@/lib/db/strategy";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { PlusIcon } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -26,10 +19,10 @@ const TYPE_LABELS: Record<string, string> = {
   LEARNING_AGENDA: "Learning Agenda",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-slate-100 text-slate-600",
-  IN_REVIEW: "bg-amber-100 text-amber-700",
-  APPROVED: "bg-green-100 text-green-700",
+const STATUS_TONE: Record<string, StatusTone> = {
+  DRAFT: "neutral",
+  IN_REVIEW: "purple",
+  APPROVED: "green",
 };
 
 export default async function StrategyPage() {
@@ -41,6 +34,59 @@ export default async function StrategyPage() {
   const docs = await getStrategyDocs();
   const canCreate = can(user, "strategy:create");
 
+  type DocRow = (typeof docs)[number];
+  const columns: DataTableColumn<DocRow>[] = [
+    {
+      key: "title",
+      header: "Title",
+      cell: (doc) => (
+        <div>
+          <Link href={`/strategy/${doc.id}`} className="font-medium hover:underline">
+            {doc.title}
+          </Link>
+          <p className="text-xs text-muted-foreground">v{doc.version}</p>
+        </div>
+      ),
+    },
+    { key: "type", header: "Type", cell: (doc) => TYPE_LABELS[doc.type] ?? doc.type },
+    {
+      key: "status",
+      header: "Status",
+      cell: (doc) => (
+        <StatusChip tone={STATUS_TONE[doc.status] ?? "neutral"}>
+          {doc.status.replace("_", " ")}
+        </StatusChip>
+      ),
+    },
+    {
+      key: "owner",
+      header: "Owner",
+      cell: (doc) => <span className="text-muted-foreground">{doc.owner.name}</span>,
+    },
+    {
+      key: "areas",
+      header: "Areas",
+      cell: (doc) => (
+        <span className="text-muted-foreground">
+          {doc.areas.map((a) => a.area.name).join(", ") || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "updated",
+      header: "Updated",
+      cell: (doc) => (
+        <span className="text-muted-foreground">
+          {new Date(doc.updatedAt).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -49,7 +95,7 @@ export default async function StrategyPage() {
         action={
           canCreate ? (
             <Button size="sm" render={<Link href="/strategy/new" />}>
-              <PlusIcon className="size-4 mr-1" />
+              <PlusIcon className="size-4" />
               New document
             </Button>
           ) : undefined
@@ -66,56 +112,7 @@ export default async function StrategyPage() {
           }
         />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Areas</TableHead>
-              <TableHead>Updated</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {docs.map((doc) => (
-              <TableRow key={doc.id} className="cursor-pointer hover:bg-muted/50">
-                <TableCell>
-                  <Link
-                    href={`/strategy/${doc.id}`}
-                    className="font-medium hover:underline"
-                  >
-                    {doc.title}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">v{doc.version}</p>
-                </TableCell>
-                <TableCell className="text-sm">
-                  {TYPE_LABELS[doc.type] ?? doc.type}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={`${STATUS_COLORS[doc.status] ?? ""} border-0 text-xs`}
-                  >
-                    {doc.status.replace("_", " ")}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {doc.owner.name}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {doc.areas.map((a) => a.area.name).join(", ") || "—"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {new Date(doc.updatedAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable columns={columns} rows={docs} getRowKey={(d) => d.id} />
       )}
     </div>
   );
