@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { inviteUser } from "@/app/actions/users";
-import { UserPlusIcon, CopyIcon } from "lucide-react";
+import { UserPlusIcon } from "lucide-react";
 
 const ROLES_NEEDING_AREA = ["AL", "AT", "KMD"] as const;
 
@@ -30,7 +30,6 @@ interface InviteUserDialogProps {
 export function InviteUserDialog({ areas }: InviteUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
-  const [copied, setCopied] = useState(false);
   const [state, formAction, pending] = useActionState(inviteUser, null);
 
   const showAreaSelect = ROLES_NEEDING_AREA.includes(
@@ -40,16 +39,8 @@ export function InviteUserDialog({ areas }: InviteUserDialogProps) {
   useEffect(() => {
     if (!open) {
       setSelectedRole("");
-      setCopied(false);
     }
   }, [open]);
-
-  const handleCopy = (password: string) => {
-    navigator.clipboard.writeText(password).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -62,28 +53,14 @@ export function InviteUserDialog({ areas }: InviteUserDialogProps) {
           <DialogTitle>Invite user</DialogTitle>
         </DialogHeader>
 
-        {state?.tempPassword ? (
+        {state?.success ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              User created successfully. Share the temporary password below — it
-              will not be shown again.
+              User created. They can sign in with their Vélezreyes+ Google
+              Workspace account using this email address.
             </p>
-            <div className="rounded-md border bg-muted px-4 py-3 flex items-center justify-between gap-3">
-              <code className="text-sm font-mono select-all">
-                {state.tempPassword}
-              </code>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleCopy(state.tempPassword!)}
-              >
-                <CopyIcon className="size-3.5 mr-1" />
-                {copied ? "Copied" : "Copy"}
-              </Button>
-            </div>
             <Button className="w-full" onClick={() => setOpen(false)}>
-              Done — I&apos;ve saved the password
+              Done
             </Button>
           </div>
         ) : (

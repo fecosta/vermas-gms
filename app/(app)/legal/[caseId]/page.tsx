@@ -4,15 +4,18 @@ import { getLegalCase } from "@/lib/db/legal";
 import { can } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { StageBadge } from "@/components/shared/stage-badge";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 import { ChecklistTable } from "@/components/legal/checklist-table";
 import { AddChecklistItemDialog } from "@/components/legal/add-checklist-item-dialog";
 import { CompleteCaseButton } from "@/components/legal/complete-case-button";
 import { ValidateTrustButton } from "@/components/legal/validate-trust-button";
 import { ChevronLeftIcon } from "lucide-react";
+import { LEGAL_TONE } from "../page";
 
 const CASE_STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
@@ -26,6 +29,13 @@ const CASE_STATUS_LABELS: Record<string, string> = {
   VALIDATED: "Validated",
   REJECTED: "Rejected",
   COMPLETE: "Complete",
+};
+
+const TRUST_TONE: Record<string, StatusTone> = {
+  NOT_SENT: "neutral",
+  SENT: "purple",
+  VALIDATED: "green",
+  REJECTED: "danger",
 };
 
 export default async function LegalCasePage({
@@ -53,6 +63,8 @@ export default async function LegalCasePage({
       (item) => !item.isRequired || item.status === "ACCEPTED"
     );
 
+  const trust = legalCase.trustValidationStatus ?? "NOT_SENT";
+
   return (
     <div className="space-y-6">
       <div>
@@ -62,7 +74,7 @@ export default async function LegalCasePage({
           render={<Link href="/legal" />}
           className="mb-2 -ml-2"
         >
-          <ChevronLeftIcon className="size-4 mr-1" />
+          <ChevronLeftIcon className="size-4" />
           All cases
         </Button>
         <PageHeader
@@ -78,44 +90,52 @@ export default async function LegalCasePage({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 text-sm">
-        <div>
-          <span className="text-muted-foreground">Case status</span>
-          <p className="font-medium mt-0.5">{CASE_STATUS_LABELS[legalCase.status] ?? legalCase.status}</p>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Initiative stage</span>
-          <div className="mt-0.5">
+      <Card>
+        <CardContent className="grid gap-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <Meta label="Case status">
+            <StatusChip tone={LEGAL_TONE[legalCase.status] ?? "neutral"}>
+              {CASE_STATUS_LABELS[legalCase.status] ?? legalCase.status}
+            </StatusChip>
+          </Meta>
+          <Meta label="Initiative stage">
             <StageBadge stage={legalCase.initiative.stage} />
-          </div>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Trust validation</span>
-          <p className="font-medium mt-0.5">
-            {legalCase.trustValidationStatus ?? "Not started"}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <span className="text-muted-foreground">Organization</span>
-          <p className="font-medium mt-0.5">{legalCase.organization.name}</p>
-        </div>
-        <div>
-          <span className="text-muted-foreground">AD</span>
-          <p className="font-medium mt-0.5">{legalCase.ad.name}</p>
-        </div>
-      </div>
+          </Meta>
+          <Meta label="Trust validation">
+            <StatusChip tone={TRUST_TONE[trust] ?? "neutral"}>
+              {trust.replace("_", " ")}
+            </StatusChip>
+          </Meta>
+          <Meta label="AD">
+            <span className="font-medium text-foreground">{legalCase.ad.name}</span>
+          </Meta>
+          <Meta label="Organization">
+            <span className="font-medium text-foreground">{legalCase.organization.name}</span>
+          </Meta>
+          <Meta label="Revisions">
+            <span className="font-medium text-foreground">{legalCase.revisionCount}</span>
+          </Meta>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Document checklist</CardTitle>
+          <CardTitle className="text-xl">Document checklist</CardTitle>
         </CardHeader>
         <CardContent>
           <ChecklistTable items={legalCase.checklistItems} isAD={isAD} />
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function Meta({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-1">{children}</div>
     </div>
   );
 }

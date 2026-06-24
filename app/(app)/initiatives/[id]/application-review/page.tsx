@@ -12,6 +12,8 @@ import { ReviewReportStatusCard } from "@/components/review/review-report-status
 import { can } from "@/lib/authz";
 import { ApplicationEditForm } from "@/components/initiatives/application-edit-form";
 import { ApplicationStatusControls } from "@/components/initiatives/application-status-controls";
+import { DocumentList } from "@/components/documents/document-list";
+import { LinkDriveButton } from "@/components/documents/link-drive-button";
 import { ChevronLeftIcon } from "lucide-react";
 
 export default async function ApplicationReviewPage({
@@ -31,6 +33,7 @@ export default async function ApplicationReviewPage({
 
   const data = await getApplication(id);
   const canEditApp = can(user, "application:edit");
+  const canManageDocs = can(user, "document:upload");
 
   return (
     <div className="space-y-6">
@@ -109,6 +112,29 @@ export default async function ApplicationReviewPage({
                   )}
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>Documents ({data.documents.length})</CardTitle>
+              {canManageDocs && (
+                <LinkDriveButton
+                  target={{
+                    kind: "application",
+                    applicationId: data.application.id,
+                    type: "FULL_APPLICATION",
+                  }}
+                  allowTypeChange
+                />
+              )}
+            </CardHeader>
+            <CardContent>
+              <DocumentList
+                documents={data.documents}
+                canManage={canManageDocs}
+                emptyLabel="No application documents linked yet."
+              />
             </CardContent>
           </Card>
 

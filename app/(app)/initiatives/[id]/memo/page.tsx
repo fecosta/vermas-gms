@@ -15,14 +15,26 @@ import { NominateReviewersForm } from "@/components/initiatives/nominate-reviewe
 import { RecordDecisionDialog } from "@/components/initiatives/record-decision-dialog";
 import { StageTransitionButton } from "@/components/initiatives/stage-transition-button";
 import { recordDecision } from "@/app/actions/decisions";
+import { DocumentList } from "@/components/documents/document-list";
+import { LinkDriveButton } from "@/components/documents/link-drive-button";
 import { ChevronLeftIcon } from "lucide-react";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
-const OUTCOME_COLORS: Record<string, string> = {
-  APPROVED: "bg-green-100 text-green-800",
-  CONDITIONALLY_APPROVED: "bg-blue-100 text-blue-800",
-  REVISION_REQUESTED: "bg-yellow-100 text-yellow-800",
-  REJECTED: "bg-red-100 text-red-800",
-  DEFERRED: "bg-gray-100 text-gray-700",
+const OUTCOME_TONE: Record<string, StatusTone> = {
+  APPROVED: "green",
+  CONDITIONALLY_APPROVED: "purple",
+  REVISION_REQUESTED: "purple",
+  REJECTED: "danger",
+  DEFERRED: "neutral",
+};
+
+const PR_TONE: Record<string, StatusTone> = {
+  COMPLETE: "green",
+  IN_REVIEW: "purple",
+  QUESTIONS_SENT: "purple",
+  AL_RESPONSE_PENDING: "purple",
+  ASSIGNED: "neutral",
+  NOT_ASSIGNED: "neutral",
 };
 
 const OUTCOME_LABELS: Record<string, string> = {
@@ -84,6 +96,7 @@ export default async function MemoPage({
   });
   const canDecide =
     can(user, "decision:record") && initiative.stage === "CEO_COMMITTEE_REVIEW";
+  const canManageDocs = can(user, "document:upload");
   const lastMemoDecision = initiative.decisions[0]?.decision ?? null;
   const boundDecisionAction = recordDecision.bind(null, id);
 
@@ -153,6 +166,29 @@ export default async function MemoPage({
           </Card>
 
           <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle>Documents ({data.documents.length})</CardTitle>
+              {canManageDocs && (
+                <LinkDriveButton
+                  target={{
+                    kind: "application",
+                    applicationId: data.application.id,
+                    type: "INVESTMENT_MEMO",
+                  }}
+                  allowTypeChange
+                />
+              )}
+            </CardHeader>
+            <CardContent>
+              <DocumentList
+                documents={data.documents}
+                canManage={canManageDocs}
+                emptyLabel="No memo documents linked yet."
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader>
               <CardTitle>Peer reviewers</CardTitle>
             </CardHeader>
@@ -166,36 +202,18 @@ export default async function MemoPage({
               )}
 
               {data.peerReviews.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left text-xs font-medium text-muted-foreground pb-2 pr-4">
-                        Reviewer
-                      </th>
-                      <th className="text-left text-xs font-medium text-muted-foreground pb-2 pr-4">
-                        Status
-                      </th>
-                      <th className="text-left text-xs font-medium text-muted-foreground pb-2">
-                        Completed
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.peerReviews.map((pr) => (
-                      <tr key={pr.id} className="border-b last:border-0">
-                        <td className="py-2 pr-4">
-                          {reviewerNames[pr.reviewerId] ?? pr.reviewerId}
-                        </td>
-                        <td className="py-2 pr-4">
-                          {PR_STATUS_LABELS[pr.status] ?? pr.status}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {pr.status === "COMPLETE" ? "✓" : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="divide-y divide-dotted divide-border">
+                  {data.peerReviews.map((pr) => (
+                    <div key={pr.id} className="flex items-center gap-3 py-2.5 text-sm">
+                      <span className="flex-1 font-medium">
+                        {reviewerNames[pr.reviewerId] ?? pr.reviewerId}
+                      </span>
+                      <StatusChip tone={PR_TONE[pr.status] ?? "neutral"}>
+                        {PR_STATUS_LABELS[pr.status] ?? pr.status}
+                      </StatusChip>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   No peer reviewers nominated yet.
@@ -228,15 +246,11 @@ export default async function MemoPage({
               ) : (
                 <div className="space-y-4">
                   {initiative.decisions.map((d) => (
-                    <div key={d.id} className="border rounded-lg p-4 space-y-2">
+                    <div key={d.id} className="space-y-2 rounded-xl border border-dotted border-border p-4">
                       <div className="flex items-center justify-between">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            OUTCOME_COLORS[d.decision] ?? "bg-gray-100 text-gray-700"
-                          }`}
-                        >
+                        <StatusChip tone={OUTCOME_TONE[d.decision] ?? "neutral"}>
                           {OUTCOME_LABELS[d.decision] ?? d.decision}
-                        </span>
+                        </StatusChip>
                         <span className="text-xs text-muted-foreground">
                           {d.decidedBy.name} · {new Date(d.decidedAt).toLocaleDateString()}
                         </span>

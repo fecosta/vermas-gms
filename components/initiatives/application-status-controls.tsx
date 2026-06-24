@@ -11,6 +11,8 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   IN_REVIEW: "In review",
   COMPLETE: "Complete",
   REJECTED: "Rejected",
+  LINK_SENT: "Link sent",
+  REVISION_REQUESTED: "Revision requested",
 };
 
 const STATUS_COLORS: Record<ApplicationStatus, string> = {
@@ -19,6 +21,8 @@ const STATUS_COLORS: Record<ApplicationStatus, string> = {
   IN_REVIEW: "text-amber-600",
   COMPLETE: "text-green-600",
   REJECTED: "text-destructive",
+  LINK_SENT: "text-blue-600",
+  REVISION_REQUESTED: "text-orange-600",
 };
 
 interface Props {

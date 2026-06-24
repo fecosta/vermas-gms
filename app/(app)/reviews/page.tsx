@@ -5,15 +5,8 @@ import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 
 const STATUS_LABELS: Record<string, string> = {
   NOT_ASSIGNED: "Not assigned",
@@ -24,12 +17,13 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETE: "Complete",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  ASSIGNED: "bg-blue-100 text-blue-700",
-  IN_REVIEW: "bg-amber-100 text-amber-700",
-  QUESTIONS_SENT: "bg-purple-100 text-purple-700",
-  AL_RESPONSE_PENDING: "bg-orange-100 text-orange-700",
-  COMPLETE: "bg-green-100 text-green-700",
+const STATUS_TONE: Record<string, StatusTone> = {
+  NOT_ASSIGNED: "neutral",
+  ASSIGNED: "neutral",
+  IN_REVIEW: "purple",
+  QUESTIONS_SENT: "purple",
+  AL_RESPONSE_PENDING: "purple",
+  COMPLETE: "green",
 };
 
 export default async function MyReviewsPage() {
@@ -58,69 +52,57 @@ export default async function MyReviewsPage() {
     orderBy: { assignedDate: "desc" },
   });
 
+  const fmt = (d: Date | null) =>
+    d
+      ? new Date(d).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "—";
+
+  type ReviewRow = (typeof reviews)[number];
+  const columns: DataTableColumn<ReviewRow>[] = [
+    {
+      key: "initiative",
+      header: "Initiative",
+      cell: (r) => (
+        <Link href={`/memos/${r.memoId}/review`} className="font-medium hover:underline">
+          {r.memo.reviewReport.application.initiative.name}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (r) => (
+        <StatusChip tone={STATUS_TONE[r.status] ?? "neutral"}>
+          {STATUS_LABELS[r.status] ?? r.status}
+        </StatusChip>
+      ),
+    },
+    {
+      key: "assigned",
+      header: "Assigned",
+      cell: (r) => <span className="text-muted-foreground">{fmt(r.assignedDate)}</span>,
+    },
+    {
+      key: "completed",
+      header: "Completed",
+      cell: (r) => <span className="text-muted-foreground">{fmt(r.completedDate)}</span>,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="My reviews"
-        description="Peer review assignments"
-      />
-
+      <PageHeader title="My reviews" description="Peer review assignments" />
       {reviews.length === 0 ? (
         <EmptyState
           title="No reviews assigned"
           description="You have no peer reviews assigned yet."
         />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Initiative</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Assigned</TableHead>
-              <TableHead>Completed</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {reviews.map((review) => {
-              const initiative =
-                review.memo.reviewReport.application.initiative;
-              const color = STATUS_COLORS[review.status] ?? "bg-slate-100 text-slate-700";
-              return (
-                <TableRow key={review.id}>
-                  <TableCell>
-                    <Link
-                      href={`/memos/${review.memoId}/review`}
-                      className="font-medium hover:underline"
-                    >
-                      {initiative.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${color} border-0 text-xs`}>
-                      {STATUS_LABELS[review.status] ?? review.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(review.assignedDate).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {review.completedDate
-                      ? new Date(review.completedDate).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : "—"}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <DataTable columns={columns} rows={reviews} getRowKey={(r) => r.id} />
       )}
     </div>
   );

@@ -75,6 +75,14 @@ enum ApplicationStatus {
   IN_REVIEW
   COMPLETE
   REJECTED
+  LINK_SENT
+  REVISION_REQUESTED
+}
+
+enum IntakeStatus {
+  NEEDS_TRIAGE
+  LINKED
+  DISMISSED
 }
 
 enum ReviewReportStatus {
@@ -185,6 +193,18 @@ enum DocumentVisibility {
   EXTERNAL
 }
 
+enum DocumentSource {
+  UPLOAD
+  DRIVE_LINK
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum CommentRelatedType {
   INITIATIVE
   CONCEPT_NOTE
@@ -248,7 +268,7 @@ model User {
   name         String
   email        String   @unique
   role         Role
-  passwordHash String
+  passwordHash String? // nullable: Google SSO is the login path; legacy hashes unused
   areaId       String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -256,6 +276,7 @@ model User {
 
   area                  Area?                     @relation(fields: [areaId], references: [id])
   ownedInitiatives      Initiative[]              @relation("InitiativeAL")
+  nextActionInitiatives Initiative[]              @relation("NextActionOwner")
   authoredMemos         InvestmentMemo[]          @relation("MemoAuthor")
   ownedStrategyDocs     StrategyDocument[]        @relation("StrategyOwner")
   approvedStrategyDocs  StrategyDocument[]        @relation("StrategyApprover")
@@ -288,15 +309,20 @@ model Area {
 }
 
 model Organization {
-  id          String   @id @default(cuid())
-  name        String
-  legalName   String?
-  country     String
-  website     String?
-  type        OrgType
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String
+  legalName             String?
+  country               String
+  website               String?
+  type                  OrgType
+  description           String?
+  googleDriveFolderId   String?
+  googleDriveFolderUrl  String?
+  googleDriveFolderName String?
+  driveFolderLinkedAt   DateTime?
+  driveFolderLinkedById String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   contacts     Contact[]
   initiatives  Initiative[]
@@ -342,7 +368,7 @@ model InitiativeSupport {
 }
 
 model Initiative {
-  id                     String                     @id @default(cuid())
+  id                     String                      @id @default(cuid())
   name                   String
   organizationId         String?
   individualName         String?
@@ -351,7 +377,7 @@ model Initiative {
   country                String
   summary                String
   source                 String?
-  stage                  Stage                      @default(SOURCED)
+  stage                  Stage                       @default(SOURCED)
   assignedAlId           String
   fitScore               Float?
   thematicAlignment      String?
@@ -362,26 +388,36 @@ model Initiative {
   solutionStrengthNotes  String?
   executionCapacityNotes String?
   criteriaSetId          String?
-  needsTechReview        Boolean                    @default(false)
+  needsTechReview        Boolean                     @default(false)
   ceoDecisionStatus      DecisionOutcome?
   legalDdStatus          InitiativeLegalDDStatus?
   onboardingStatus       InitiativeOnboardingStatus?
-  createdAt              DateTime                   @default(now())
-  updatedAt              DateTime                   @updatedAt
+  googleDriveFolderId    String?
+  googleDriveFolderUrl   String?
+  googleDriveFolderName  String?
+  driveFolderLinkedAt    DateTime?
+  driveFolderLinkedById  String?
+  nextAction             String?
+  nextActionDueDate      DateTime?
+  nextActionOwnerId      String?
+  priority               Priority?
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
 
-  organization   Organization?       @relation(fields: [organizationId], references: [id])
-  primaryContact Contact?            @relation("PrimaryContact", fields: [primaryContactId], references: [id])
-  area           Area                @relation(fields: [areaId], references: [id])
-  assignedAl     User                @relation("InitiativeAL", fields: [assignedAlId], references: [id])
-  criteriaSet    CriteriaSet?        @relation(fields: [criteriaSetId], references: [id])
-  supportingAt   InitiativeSupport[]
-  contacts       InitiativeContact[]
-  documents      Document[]
-  meetings       Meeting[]
-  application    Application?
-  legalDdCase    LegalDueDiligenceCase?
-  grant          Grant?
-  decisions      Decision[]
+  organization    Organization?          @relation(fields: [organizationId], references: [id])
+  primaryContact  Contact?               @relation("PrimaryContact", fields: [primaryContactId], references: [id])
+  area            Area                   @relation(fields: [areaId], references: [id])
+  assignedAl      User                   @relation("InitiativeAL", fields: [assignedAlId], references: [id])
+  nextActionOwner User?                  @relation("NextActionOwner", fields: [nextActionOwnerId], references: [id])
+  criteriaSet     CriteriaSet?           @relation(fields: [criteriaSetId], references: [id])
+  supportingAt    InitiativeSupport[]
+  contacts        InitiativeContact[]
+  documents       Document[]
+  meetings        Meeting[]
+  application     Application?
+  legalDdCase     LegalDueDiligenceCase?
+  grant           Grant?
+  decisions       Decision[]
   // auditLogs fetched via query: prisma.auditLog.findMany({ where: { entityType: 'INITIATIVE', entityId: id } })
 
   @@index([stage])
@@ -408,10 +444,10 @@ model Application {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  initiative   Initiative              @relation(fields: [initiativeId], references: [id])
-  organization Organization            @relation(fields: [organizationId], references: [id])
-  criteriaSet  CriteriaSet?            @relation(fields: [criteriaSetId], references: [id])
-  al           User                    @relation("ApplicationAL", fields: [alId], references: [id])
+  initiative   Initiative               @relation(fields: [initiativeId], references: [id])
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  criteriaSet  CriteriaSet?             @relation(fields: [criteriaSetId], references: [id])
+  al           User                     @relation("ApplicationAL", fields: [alId], references: [id])
   reviewReport ApplicationReviewReport?
   documents    Document[]
 }
@@ -429,9 +465,9 @@ model ApplicationReviewReport {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  application  Application    @relation(fields: [applicationId], references: [id])
-  kmdReviewer  User?          @relation("KmdReviewer", fields: [kmdReviewerId], references: [id])
-  memo         InvestmentMemo?
+  application Application     @relation(fields: [applicationId], references: [id])
+  kmdReviewer User?           @relation("KmdReviewer", fields: [kmdReviewerId], references: [id])
+  memo        InvestmentMemo?
 }
 
 model InvestmentMemo {
@@ -515,9 +551,9 @@ model Meeting {
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 
-  initiative   Initiative          @relation(fields: [initiativeId], references: [id])
+  initiative   Initiative           @relation(fields: [initiativeId], references: [id])
   participants MeetingParticipant[]
-  kickoffGrant Grant?              @relation("KickoffMeeting")
+  kickoffGrant Grant?               @relation("KickoffMeeting")
 
   @@index([initiativeId])
 }
@@ -697,25 +733,35 @@ model CriteriaItem {
 // ================================================================
 
 model Document {
-  id             String             @id @default(cuid())
-  initiativeId   String?
-  organizationId String?
-  applicationId  String?
-  type           DocumentType
-  stage          Stage?
-  fileName       String
-  storageKey     String
-  uploadedById   String
-  uploadedAt     DateTime           @default(now())
-  version        Int                @default(1)
-  status         String?
-  visibility     DocumentVisibility @default(INTERNAL)
-  notes          String?
+  id                 String             @id @default(cuid())
+  initiativeId       String?
+  organizationId     String?
+  applicationId      String?
+  type               DocumentType
+  stage              Stage?
+  fileName           String
+  source             DocumentSource     @default(DRIVE_LINK)
+  storageKey         String?
+  // Google Drive metadata — cached once on link (source = DRIVE_LINK)
+  googleFileId       String?
+  googleFileUrl      String?
+  googleFileName     String?
+  googleMimeType     String?
+  googleModifiedTime DateTime?
+  googleOwnerName    String?
+  googleFileSize     String?
+  lastSyncedAt       DateTime?
+  uploadedById       String
+  uploadedAt         DateTime           @default(now())
+  version            Int                @default(1)
+  status             String?
+  visibility         DocumentVisibility @default(INTERNAL)
+  notes              String?
 
-  initiative     Initiative?   @relation(fields: [initiativeId], references: [id])
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  application    Application?  @relation(fields: [applicationId], references: [id])
-  uploadedBy     User          @relation(fields: [uploadedById], references: [id])
+  initiative     Initiative?          @relation(fields: [initiativeId], references: [id])
+  organization   Organization?        @relation(fields: [organizationId], references: [id])
+  application    Application?         @relation(fields: [applicationId], references: [id])
+  uploadedBy     User                 @relation(fields: [uploadedById], references: [id])
   checklistItems LegalChecklistItem[]
   decisions      Decision[]
 
@@ -753,4 +799,23 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorId])
+}
+
+// Jotform intake inbox — holds a submission before it is triaged onto an Initiative.
+// (Application.initiativeId is required + unique, so it cannot hold an un-triaged submission.)
+model ApplicationIntake {
+  id                  String       @id @default(cuid())
+  jotformFormId       String?
+  jotformSubmissionId String       @unique
+  submissionUrl       String?
+  pdfUrl              String?
+  submittedByName     String?
+  submittedByEmail    String?
+  submittedAt         DateTime     @default(now())
+  rawJson             Json?
+  status              IntakeStatus @default(NEEDS_TRIAGE)
+  linkedInitiativeId  String?
+  createdAt           DateTime     @default(now())
+
+  @@index([status])
 }

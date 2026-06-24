@@ -24,7 +24,7 @@ function navItemsForRole(role: SessionUser["role"]): NavItem[] {
       return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }, { href: "/criteria", label: "Criteria" }];
     case "AL":
     case "AT":
-      return [...base, ...pipeline];
+      return [...base, ...pipeline, { href: "/intake", label: "Intake" }];
     case "AD":
       return [...base, { href: "/legal", label: "Legal DD" }];
     case "TL":
@@ -32,7 +32,7 @@ function navItemsForRole(role: SessionUser["role"]): NavItem[] {
     case "PEER_REVIEWER":
       return [{ href: "/dashboard", label: "Dashboard" }, { href: "/reviews", label: "My reviews" }];
     case "ADMIN":
-      return [...base, ...pipeline, { href: "/strategy", label: "Strategy" }, { href: "/criteria", label: "Criteria" }, { href: "/admin", label: "Admin" }];
+      return [...base, ...pipeline, { href: "/intake", label: "Intake" }, { href: "/strategy", label: "Strategy" }, { href: "/criteria", label: "Criteria" }, { href: "/admin", label: "Admin" }];
     default:
       return base;
   }

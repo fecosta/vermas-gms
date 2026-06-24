@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { linkedDocumentSelect } from "@/lib/db/documents";
 
 export async function getLegalCases() {
   return prisma.legalDueDiligenceCase.findMany({
@@ -22,6 +23,7 @@ export async function getLegalCase(id: string) {
       checklistItems: {
         orderBy: { createdAt: "asc" },
         include: {
+          document: { select: linkedDocumentSelect },
           reviewedBy: { select: { id: true, name: true } },
           revisions: {
             orderBy: { requestedAt: "desc" },

@@ -5,17 +5,10 @@ import type { SessionUser } from "@/lib/auth";
 import { can } from "@/lib/authz";
 import { prisma } from "@/lib/db/client";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusChip } from "@/components/ui/status-chip";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { ChevronLeftIcon } from "lucide-react";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -41,6 +34,62 @@ export default async function AuditLogPage() {
     include: { actor: { select: { id: true, name: true, role: true } } },
   });
 
+  type Entry = (typeof entries)[number];
+  const columns: DataTableColumn<Entry>[] = [
+    {
+      key: "actor",
+      header: "Actor",
+      cell: (e) => (
+        <div>
+          <p className="font-medium">{e.actor.name}</p>
+          <p className="text-xs text-muted-foreground">{e.actor.role.replace("_", " ")}</p>
+        </div>
+      ),
+    },
+    {
+      key: "action",
+      header: "Action",
+      cell: (e) => <StatusChip tone="neutral">{ACTION_LABELS[e.action] ?? e.action}</StatusChip>,
+    },
+    {
+      key: "entity",
+      header: "Entity",
+      cell: (e) =>
+        e.entityType === "INITIATIVE" ? (
+          <Link href={`/initiatives/${e.entityId}`} className="hover:underline">
+            Initiative
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">{e.entityType}</span>
+        ),
+    },
+    {
+      key: "detail",
+      header: "Detail",
+      cell: (e) => {
+        const after = e.after as Record<string, unknown> | null;
+        const detail =
+          e.action === "STAGE_CHANGE" && after?.stage ? String(after.stage) : null;
+        return <span className="text-muted-foreground">{detail ?? "—"}</span>;
+      },
+    },
+    {
+      key: "date",
+      header: "Date",
+      cell: (e) => (
+        <span className="whitespace-nowrap text-muted-foreground">
+          {new Date(e.createdAt).toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -50,82 +99,19 @@ export default async function AuditLogPage() {
           render={<Link href="/admin" />}
           className="mb-2 -ml-2"
         >
-          <ChevronLeftIcon className="size-4 mr-1" />
+          <ChevronLeftIcon className="size-4" />
           Back to admin
         </Button>
-        <PageHeader
-          title="Audit log"
-          description="Last 50 system-wide events"
-        />
+        <PageHeader title="Audit log" description="Last 50 system-wide events" />
       </div>
 
       {entries.length === 0 ? (
-        <EmptyState title="No events yet" description="Activity will appear here as users take actions." />
+        <EmptyState
+          title="No events yet"
+          description="Activity will appear here as users take actions."
+        />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Actor</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Entity</TableHead>
-              <TableHead>Detail</TableHead>
-              <TableHead>Date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {entries.map((entry) => {
-              const after = entry.after as Record<string, unknown> | null;
-              const detail =
-                entry.action === "STAGE_CHANGE" && after?.stage
-                  ? String(after.stage)
-                  : null;
-
-              return (
-                <TableRow key={entry.id}>
-                  <TableCell className="text-sm">
-                    <div>
-                      <p className="font-medium">{entry.actor.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.actor.role.replace("_", " ")}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {ACTION_LABELS[entry.action] ?? entry.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {entry.entityType === "INITIATIVE" ? (
-                      <Link
-                        href={`/initiatives/${entry.entityId}`}
-                        className="hover:underline text-primary"
-                      >
-                        Initiative
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        {entry.entityType}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {detail ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(entry.createdAt).toLocaleString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <DataTable columns={columns} rows={entries} getRowKey={(e) => e.id} />
       )}
     </div>
   );

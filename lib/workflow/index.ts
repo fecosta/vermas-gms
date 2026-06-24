@@ -200,3 +200,60 @@ export function isRevisionReturn(fromStage: Stage, toStage: Stage): boolean {
   const toIdx = STAGE_ORDER.indexOf(toStage);
   return toIdx < fromIdx;
 }
+
+// ----------------------------------------------------------------
+// Board columns — a derived 7-column view over the 16 detailed stages.
+// Purely for display/grouping; does NOT affect STAGE_ORDER or canTransition.
+// ----------------------------------------------------------------
+
+export type PipelineColumn =
+  | "Sourcing"
+  | "Screening"
+  | "Application"
+  | "Memo Review"
+  | "Legal Due Diligence"
+  | "Onboarding"
+  | "Active Grant Management";
+
+export const COLUMN_ORDER: PipelineColumn[] = [
+  "Sourcing",
+  "Screening",
+  "Application",
+  "Memo Review",
+  "Legal Due Diligence",
+  "Onboarding",
+  "Active Grant Management",
+];
+
+// Exhaustive map — TypeScript enforces that every Stage is covered.
+const STAGE_TO_COLUMN: Record<Stage, PipelineColumn> = {
+  SOURCED: "Sourcing",
+  SCOPING: "Sourcing",
+  SCREENING_MATERIALS_REQUESTED: "Screening",
+  CONCEPT_REVIEW: "Screening",
+  CONCEPT_DECISION: "Screening",
+  APPLICATION_REQUESTED: "Application",
+  APPLICATION_RECEIVED: "Application",
+  APPLICATION_REVIEW: "Application",
+  MEMO_DRAFTING: "Memo Review",
+  PEER_REVIEW: "Memo Review",
+  CEO_COMMITTEE_REVIEW: "Memo Review",
+  MEMO_DECISION: "Memo Review",
+  LEGAL_DUE_DILIGENCE: "Legal Due Diligence",
+  LEGAL_DD_COMPLETE: "Legal Due Diligence",
+  ONBOARDING: "Onboarding",
+  ACTIVE: "Active Grant Management",
+};
+
+export function columnForStage(stage: Stage): PipelineColumn {
+  return STAGE_TO_COLUMN[stage];
+}
+
+// Detailed stages grouped under each column, preserving STAGE_ORDER sequence.
+export const STAGES_BY_COLUMN: Record<PipelineColumn, Stage[]> = COLUMN_ORDER.reduce(
+  (acc, col) => {
+    acc[col] = STAGE_ORDER.filter((s) => STAGE_TO_COLUMN[s] === col);
+    return acc;
+  },
+  {} as Record<PipelineColumn, Stage[]>
+);

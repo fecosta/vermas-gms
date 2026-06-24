@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth";
+import type { SessionUser } from "@/lib/auth";
+import { can } from "@/lib/authz";
 import { getOrganization } from "@/lib/db/organizations";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { StatusChip } from "@/components/ui/status-chip";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { EditOrganizationDialog } from "@/components/organizations/organization-dialog";
 import { CreateContactDialog } from "@/components/contacts/contact-dialog";
+import { DocumentList } from "@/components/documents/document-list";
+import { LinkDriveButton } from "@/components/documents/link-drive-button";
+import { FolderLinkField } from "@/components/documents/folder-link-field";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -14,6 +21,9 @@ interface Props {
 
 export default async function OrganizationDetailPage({ params }: Props) {
   const { id } = await params;
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+  const canManage = can(user, "document:upload");
 
   let org;
   try {
@@ -27,7 +37,14 @@ export default async function OrganizationDetailPage({ params }: Props) {
       <PageHeader
         title={org.name}
         description={org.country}
-        action={<EditOrganizationDialog org={org} />}
+        action={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" render={<Link href={`/portal/${org.id}`} />}>
+              Preview portal
+            </Button>
+            <EditOrganizationDialog org={org} />
+          </div>
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -40,7 +57,7 @@ export default async function OrganizationDetailPage({ params }: Props) {
               <Row label="Legal name" value={org.legalName} />
             )}
             <Row label="Type">
-              <Badge variant="outline">{org.type}</Badge>
+              <StatusChip tone="neutral">{org.type}</StatusChip>
             </Row>
             <Row label="Country" value={org.country} />
             {org.website && (
@@ -58,6 +75,15 @@ export default async function OrganizationDetailPage({ params }: Props) {
             {org.description && (
               <Row label="Description" value={org.description} />
             )}
+            <Row label="Drive folder">
+              <FolderLinkField
+                kind="organization"
+                id={org.id}
+                folderName={org.googleDriveFolderName}
+                folderUrl={org.googleDriveFolderUrl}
+                canManage={canManage}
+              />
+            </Row>
           </CardContent>
         </Card>
 
@@ -72,7 +98,7 @@ export default async function OrganizationDetailPage({ params }: Props) {
             {org.contacts.length === 0 ? (
               <p className="text-sm text-muted-foreground">No contacts yet.</p>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y divide-dotted divide-border">
                 {org.contacts.map((c) => (
                   <div key={c.id} className="py-2">
                     <Link
@@ -128,6 +154,27 @@ export default async function OrganizationDetailPage({ params }: Props) {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium">
+            Documents ({org.documents.length})
+          </CardTitle>
+          {canManage && (
+            <LinkDriveButton
+              target={{
+                kind: "organization",
+                organizationId: org.id,
+                type: "INSTITUTIONAL_DECK",
+              }}
+              allowTypeChange
+            />
+          )}
+        </CardHeader>
+        <CardContent>
+          <DocumentList documents={org.documents} canManage={canManage} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

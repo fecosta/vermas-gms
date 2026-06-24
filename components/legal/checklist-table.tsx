@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateChecklistItemStatus, requestRevision, resolveRevision } from "@/app/actions/legal";
+import { LinkDriveButton } from "@/components/documents/link-drive-button";
 import type { ChecklistItemStatus } from "@/app/generated/prisma/enums";
 import type { LegalCaseDetail } from "@/lib/db/legal";
 
@@ -166,6 +167,27 @@ function ChecklistRow({ item, isAD }: { item: ChecklistItem; isAD: boolean }) {
           </span>
         )}
       </td>
+      <td className="py-3 pr-4 align-top pt-3">
+        {item.document ? (
+          <a
+            href={item.document.googleFileUrl ?? "#"}
+            target="_blank"
+            rel="noreferrer"
+            className="block max-w-40 truncate text-xs text-primary hover:underline"
+          >
+            {item.document.fileName}
+          </a>
+        ) : isAD ? (
+          <LinkDriveButton
+            target={{ kind: "checklist-item", itemId: item.id }}
+            label="Link file"
+            size="xs"
+            variant="ghost"
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </td>
       <td className="py-3 text-xs text-muted-foreground align-top pt-3">
         {item.reviewedBy?.name}
         {item.reviewedDate && (
@@ -192,6 +214,7 @@ export function ChecklistTable({ items, isAD }: ChecklistTableProps) {
           <th className="text-left text-xs font-medium text-muted-foreground pb-2 pr-4">Document</th>
           <th className="text-center text-xs font-medium text-muted-foreground pb-2 pr-4">Required</th>
           <th className="text-left text-xs font-medium text-muted-foreground pb-2 pr-4">Status</th>
+          <th className="text-left text-xs font-medium text-muted-foreground pb-2 pr-4">File</th>
           <th className="text-left text-xs font-medium text-muted-foreground pb-2">Reviewed by</th>
         </tr>
       </thead>

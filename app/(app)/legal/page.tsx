@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StageBadge } from "@/components/shared/stage-badge";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
 const CASE_STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
@@ -22,18 +23,18 @@ const CASE_STATUS_LABELS: Record<string, string> = {
   COMPLETE: "Complete",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  NOT_STARTED: "bg-gray-100 text-gray-700",
-  REQUESTED: "bg-blue-100 text-blue-700",
-  DOCUMENTS_PENDING: "bg-yellow-100 text-yellow-700",
-  SUBMITTED: "bg-blue-100 text-blue-700",
-  UNDER_AD_REVIEW: "bg-purple-100 text-purple-700",
-  REVISIONS_REQUESTED: "bg-orange-100 text-orange-700",
-  RESUBMITTED: "bg-blue-100 text-blue-700",
-  TRUST_VALIDATION: "bg-indigo-100 text-indigo-700",
-  VALIDATED: "bg-green-100 text-green-700",
-  REJECTED: "bg-red-100 text-red-700",
-  COMPLETE: "bg-emerald-100 text-emerald-700",
+export const LEGAL_TONE: Record<string, StatusTone> = {
+  NOT_STARTED: "neutral",
+  REQUESTED: "purple",
+  DOCUMENTS_PENDING: "purple",
+  SUBMITTED: "purple",
+  UNDER_AD_REVIEW: "purple",
+  REVISIONS_REQUESTED: "danger",
+  RESUBMITTED: "purple",
+  TRUST_VALIDATION: "purple",
+  VALIDATED: "green",
+  REJECTED: "danger",
+  COMPLETE: "green",
 };
 
 export default async function LegalPage() {
@@ -53,7 +54,10 @@ export default async function LegalPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Legal Due Diligence" description={`${cases.length} case${cases.length !== 1 ? "s" : ""}`} />
+      <PageHeader
+        title="Legal Due Diligence"
+        description={`${cases.length} case${cases.length !== 1 ? "s" : ""}`}
+      />
 
       {cases.length === 0 ? (
         <EmptyState
@@ -63,26 +67,22 @@ export default async function LegalPage() {
       ) : (
         <div className="space-y-3">
           {cases.map((c) => (
-            <Link key={c.id} href={`/legal/${c.id}`}>
-              <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{c.initiative.name}</p>
-                      <p className="text-sm text-muted-foreground">{c.organization.name}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <StageBadge stage={c.initiative.stage} />
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[c.status] ?? "bg-gray-100 text-gray-700"}`}>
-                        {CASE_STATUS_LABELS[c.status] ?? c.status}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        AD: {c.ad.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {c._count.checklistItems} items
-                      </span>
-                    </div>
+            <Link key={c.id} href={`/legal/${c.id}`} className="block">
+              <Card className="transition-colors hover:bg-cream-soft">
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground">{c.initiative.name}</p>
+                    <p className="text-sm text-muted-foreground">{c.organization.name}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StageBadge stage={c.initiative.stage} />
+                    <StatusChip tone={LEGAL_TONE[c.status] ?? "neutral"}>
+                      {CASE_STATUS_LABELS[c.status] ?? c.status}
+                    </StatusChip>
+                    <span className="text-xs text-muted-foreground">AD: {c.ad.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {c._count.checklistItems} items
+                    </span>
                   </div>
                 </CardContent>
               </Card>

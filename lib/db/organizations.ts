@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { linkedDocumentSelect } from "@/lib/db/documents";
 
 export async function getOrganizations() {
   return prisma.organization.findMany({
@@ -23,6 +24,10 @@ export async function getOrganization(id: string) {
           country: true,
           assignedAl: { select: { id: true, name: true } },
         },
+      },
+      documents: {
+        select: linkedDocumentSelect,
+        orderBy: { uploadedAt: "desc" },
       },
     },
   });

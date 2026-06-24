@@ -44,8 +44,8 @@ export default async function AreasPage() {
 
       <AreaList areas={areas} />
 
-      <div className="border-t pt-6">
-        <h2 className="text-sm font-semibold mb-4">Add area</h2>
+      <div className="border-t border-dotted border-border pt-6">
+        <h2 className="mb-4 font-serif text-lg">Add area</h2>
         <CreateAreaForm action={createArea} />
       </div>
     </div>
