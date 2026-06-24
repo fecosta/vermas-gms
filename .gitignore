@@ -41,6 +41,10 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+<<<<<<< HEAD
 
 # secrets — never commit OAuth client credentials
 context/client_secret_*.json
+=======
+/context*
+>>>>>>> 816a386 (fix: update .gitignore)
