@@ -62,13 +62,20 @@ export default async function MemoReviewPage({
         <PageHeader title="Peer Review" description={initiativeName} />
       </div>
 
+      {user.role === "PEER_REVIEWER" && (
+        <div className="rounded-xl border border-dotted border-border bg-cream-soft px-4 py-3 text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">Peer reviewer view</span> — you see
+          only the assigned memo. Internal comments, other reviews, and assessments are hidden.
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Memo content</CardTitle>
         </CardHeader>
         <CardContent>
           {memo.body ? (
-            <p className="text-sm whitespace-pre-wrap font-mono">{memo.body}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{memo.body}</p>
           ) : (
             <p className="text-sm text-muted-foreground">Memo content has not been added yet.</p>
           )}
@@ -83,7 +90,7 @@ export default async function MemoReviewPage({
           <CardContent>
             {userReview.status === "COMPLETE" ? (
               <div className="space-y-2">
-                <p className="text-xs text-green-600 font-medium">Review submitted ✓</p>
+                <p className="text-xs font-medium text-green-deep">Review submitted ✓</p>
                 {userReview.reviewText && (
                   <p className="text-sm whitespace-pre-wrap">{userReview.reviewText}</p>
                 )}
@@ -118,7 +125,7 @@ export default async function MemoReviewPage({
             ) : (
               <div className="space-y-4">
                 {memo.peerReviews.map((pr) => (
-                  <div key={pr.id} className="border rounded-lg p-4 space-y-1">
+                  <div key={pr.id} className="space-y-1 rounded-xl border border-dotted border-border p-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{pr.reviewer.name}</span>
                       <span className="text-xs text-muted-foreground capitalize">
