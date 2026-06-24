@@ -65,7 +65,7 @@ export default async function ContactDetailPage({ params }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="divide-y">
+            <div className="divide-y divide-dotted divide-border">
               {contact.primaryForInitiatives.map((init) => (
                 <div
                   key={init.id}

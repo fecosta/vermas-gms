@@ -4,22 +4,45 @@ import { getOrganizations } from "@/lib/db/organizations";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CreateContactDialog } from "@/components/contacts/contact-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 
 export default async function ContactsPage() {
-  const [contacts, orgs] = await Promise.all([
-    getContacts(),
-    getOrganizations(),
-  ]);
-
+  const [contacts, orgs] = await Promise.all([getContacts(), getOrganizations()]);
   const orgOptions = orgs.map((o) => ({ id: o.id, name: o.name }));
+
+  type ContactRow = (typeof contacts)[number];
+  const columns: DataTableColumn<ContactRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (c) => (
+        <Link href={`/contacts/${c.id}`} className="font-medium hover:underline">
+          {c.fullName}
+        </Link>
+      ),
+    },
+    {
+      key: "title",
+      header: "Title",
+      cell: (c) => <span className="text-muted-foreground">{c.title ?? "—"}</span>,
+    },
+    { key: "email", header: "Email", cell: (c) => c.email },
+    {
+      key: "org",
+      header: "Organization",
+      cell: (c) =>
+        c.organization ? (
+          <Link
+            href={`/organizations/${c.organization.id}`}
+            className="text-muted-foreground hover:underline"
+          >
+            {c.organization.name}
+          </Link>
+        ) : (
+          "—"
+        ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -34,48 +57,7 @@ export default async function ContactsPage() {
           description="Contacts are added when you create or edit an organization."
         />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Organization</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>
-                    <Link
-                      href={`/contacts/${c.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {c.fullName}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {c.title ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">{c.email}</TableCell>
-                  <TableCell className="text-sm">
-                    {c.organization ? (
-                      <Link
-                        href={`/organizations/${c.organization.id}`}
-                        className="hover:underline text-muted-foreground"
-                      >
-                        {c.organization.name}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable columns={columns} rows={contacts} getRowKey={(c) => c.id} />
       )}
     </div>
   );

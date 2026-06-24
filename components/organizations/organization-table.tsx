@@ -1,15 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { StatusChip } from "@/components/ui/status-chip";
 import { EditOrganizationDialog } from "./organization-dialog";
 import type { OrgWithCounts } from "@/lib/db/organizations";
 
@@ -25,52 +18,48 @@ interface OrganizationTableProps {
 }
 
 export function OrganizationTable({ organizations }: OrganizationTableProps) {
-  return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Country</TableHead>
-            <TableHead className="text-center">Initiatives</TableHead>
-            <TableHead className="text-center">Contacts</TableHead>
-            <TableHead className="w-16" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {organizations.map((org) => (
-            <TableRow key={org.id}>
-              <TableCell>
-                <Link
-                  href={`/organizations/${org.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {org.name}
-                </Link>
-                {org.legalName && org.legalName !== org.name && (
-                  <p className="text-xs text-muted-foreground">{org.legalName}</p>
-                )}
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="text-xs">
-                  {TYPE_LABELS[org.type] ?? org.type}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-sm">{org.country}</TableCell>
-              <TableCell className="text-center text-sm">
-                {org._count.initiatives}
-              </TableCell>
-              <TableCell className="text-center text-sm">
-                {org._count.contacts}
-              </TableCell>
-              <TableCell>
-                <EditOrganizationDialog org={org} />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+  const columns: DataTableColumn<OrgWithCounts>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (org) => (
+        <div>
+          <Link href={`/organizations/${org.id}`} className="font-medium hover:underline">
+            {org.name}
+          </Link>
+          {org.legalName && org.legalName !== org.name && (
+            <p className="text-xs text-muted-foreground">{org.legalName}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "type",
+      header: "Type",
+      cell: (org) => <StatusChip tone="neutral">{TYPE_LABELS[org.type] ?? org.type}</StatusChip>,
+    },
+    { key: "country", header: "Country", cell: (org) => org.country },
+    {
+      key: "initiatives",
+      header: "Initiatives",
+      headerClassName: "text-center",
+      className: "text-center",
+      cell: (org) => org._count.initiatives,
+    },
+    {
+      key: "contacts",
+      header: "Contacts",
+      headerClassName: "text-center",
+      className: "text-center",
+      cell: (org) => org._count.contacts,
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      cell: (org) => <EditOrganizationDialog org={org} />,
+    },
+  ];
+
+  return <DataTable columns={columns} rows={organizations} getRowKey={(o) => o.id} />;
 }
