@@ -7,7 +7,7 @@ import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { assertCan } from "@/lib/authz";
 import { canTransition } from "@/lib/workflow";
-import type { Stage } from "@/app/generated/prisma/enums";
+import type { Stage, Priority } from "@/app/generated/prisma/enums";
 import { InitiativeSchema } from "@/lib/validations";
 
 type State = { errors?: Record<string, string[]>; message?: string } | null;
@@ -407,4 +407,42 @@ export async function removeSupportingAt(
   });
 
   revalidatePath(`/initiatives/${initiativeId}`);
+}
+
+export async function updateNextAction(
+  id: string,
+  data: {
+    nextAction: string | null;
+    nextActionDueDate: string | null;
+    nextActionOwnerId: string | null;
+    priority: Priority | null;
+  }
+): Promise<{ error?: string }> {
+  const session = await auth();
+  const user = session!.user as unknown as SessionUser;
+
+  const existing = await prisma.initiative.findUniqueOrThrow({
+    where: { id },
+    select: { assignedAlId: true, supportingAt: { select: { userId: true } } },
+  });
+
+  assertCan(user, "initiative:edit", {
+    type: "initiative",
+    assignedAlId: existing.assignedAlId,
+    supportingAtIds: existing.supportingAt.map((s) => s.userId),
+  });
+
+  await prisma.initiative.update({
+    where: { id },
+    data: {
+      nextAction: data.nextAction?.trim() || null,
+      nextActionDueDate: data.nextActionDueDate ? new Date(data.nextActionDueDate) : null,
+      nextActionOwnerId: data.nextActionOwnerId || null,
+      priority: data.priority,
+    },
+  });
+
+  revalidatePath(`/initiatives/${id}`);
+  revalidatePath("/initiatives");
+  return {};
 }

@@ -49,6 +49,9 @@ export type Action =
   // Meetings
   | "meeting:create"
   | "meeting:select-participants" // CEO only
+  // Intake (Jotform triage)
+  | "intake:view"
+  | "intake:triage"
   // Admin
   | "users:manage"
   | "audit-log:view"
@@ -180,6 +183,11 @@ export function can(
 
     case "meeting:select-participants":
       return role === "CEO";
+
+    // ------- Intake (Jotform triage) -------
+    case "intake:view":
+    case "intake:triage":
+      return ["AL", "AT", "ADMIN"].includes(role);
 
     // ------- Admin -------
     case "users:manage":

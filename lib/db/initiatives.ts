@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { linkedDocumentSelect } from "@/lib/db/documents";
 import type { SessionUser } from "@/lib/auth";
 
 export async function getInitiatives(user: SessionUser) {
@@ -13,16 +14,30 @@ export async function getInitiatives(user: SessionUser) {
         ],
       };
 
-  return prisma.initiative.findMany({
+  const initiatives = await prisma.initiative.findMany({
     where,
     orderBy: { updatedAt: "desc" },
     include: {
       area: { select: { id: true, name: true } },
       organization: { select: { id: true, name: true } },
       assignedAl: { select: { id: true, name: true } },
-      _count: { select: { decisions: true } },
+      nextActionOwner: { select: { id: true, name: true } },
+      grant: { select: { nextReportDue: true } },
+      _count: { select: { decisions: true, documents: true } },
     },
   });
+
+  // Flag initiatives that were linked from a Jotform intake (no FK relation exists).
+  const ids = initiatives.map((i) => i.id);
+  const linked = ids.length
+    ? await prisma.applicationIntake.findMany({
+        where: { status: "LINKED", linkedInitiativeId: { in: ids } },
+        select: { linkedInitiativeId: true },
+      })
+    : [];
+  const intakeSet = new Set(linked.map((l) => l.linkedInitiativeId));
+
+  return initiatives.map((i) => ({ ...i, hasIntake: intakeSet.has(i.id) }));
 }
 
 export async function getInitiative(id: string) {
@@ -54,6 +69,10 @@ export async function getInitiative(id: string) {
         },
       },
       legalDdCase: { select: { id: true, status: true } },
+      documents: {
+        select: linkedDocumentSelect,
+        orderBy: { uploadedAt: "desc" },
+      },
     },
   });
 

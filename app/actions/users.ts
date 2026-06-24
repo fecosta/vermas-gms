@@ -5,13 +5,12 @@ import { auth } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { assertCan } from "@/lib/authz";
-import bcrypt from "bcryptjs";
 import type { Role } from "@/app/generated/prisma/enums";
 
 type InviteState = {
   errors?: Record<string, string[]>;
   message?: string;
-  tempPassword?: string;
+  success?: boolean;
 } | null;
 
 const VALID_ROLES: Role[] = [
@@ -46,16 +45,10 @@ export async function inviteUser(
     return { errors: { email: ["Email already registered"] } };
   }
 
-  const chars =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const tempPassword = Array.from(
-    { length: 12 },
-    () => chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
-  const passwordHash = await bcrypt.hash(tempPassword, 12);
-
+  // No password is set: users sign in with their Google Workspace account,
+  // matched to this record by email on first login.
   await prisma.user.create({
-    data: { name, email, role, areaId, passwordHash, isActive: true },
+    data: { name, email, role, areaId, isActive: true },
   });
 
   await prisma.auditLog.create({
@@ -69,7 +62,7 @@ export async function inviteUser(
   });
 
   revalidatePath("/admin");
-  return { message: "User invited.", tempPassword };
+  return { message: "User invited.", success: true };
 }
 
 export async function setUserActive(
