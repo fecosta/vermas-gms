@@ -5,14 +5,29 @@ import { prisma } from "@/lib/db/client";
 import { can } from "@/lib/authz";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 import { GrantForm } from "@/components/grants/grant-form";
 import { KPITable } from "@/components/grants/kpi-table";
 import { createOrUpdateGrant } from "@/app/actions/grants";
 import { CompleteOnboardingButton } from "@/components/initiatives/complete-onboarding-button";
 import { ChevronLeftIcon } from "lucide-react";
+
+const GRANT_TONE: Record<string, StatusTone> = {
+  ACTIVE: "green",
+  PAUSED: "purple",
+  CLOSED: "neutral",
+};
+
+const ONBOARDING_TONE: Record<string, StatusTone> = {
+  NOT_STARTED: "neutral",
+  SCHEDULED: "purple",
+  IN_PROGRESS: "purple",
+  COMPLETED: "green",
+};
 
 export default async function OnboardingPage({
   params,
@@ -31,10 +46,9 @@ export default async function OnboardingPage({
 
   const grant = await getGrant(id);
 
-  const canEdit = can(user, "grant:edit") && (
-    user.role === "ADMIN" ||
-    initiative.assignedAlId === user.id
-  );
+  const canEdit =
+    can(user, "grant:edit") &&
+    (user.role === "ADMIN" || initiative.assignedAlId === user.id);
 
   const boundAction = createOrUpdateGrant.bind(null, id);
 
@@ -47,7 +61,7 @@ export default async function OnboardingPage({
           render={<Link href={`/initiatives/${id}`} />}
           className="mb-2 -ml-2"
         >
-          <ChevronLeftIcon className="size-4 mr-1" />
+          <ChevronLeftIcon className="size-4" />
           Back to initiative
         </Button>
         <PageHeader
@@ -62,52 +76,68 @@ export default async function OnboardingPage({
       </div>
 
       {grant?.onboardingStatus === "COMPLETED" && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          Onboarding complete. This initiative is now active.
+        <div className="rounded-xl border border-dotted border-border bg-[color-mix(in_srgb,var(--green)_12%,white)] px-4 py-3 text-sm font-medium text-green-deep">
+          Onboarding complete — this initiative is now an active grant.
         </div>
       )}
 
       {grant && (
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground">Status</span>
-            <p className="font-medium mt-0.5">{grant.status}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Onboarding status</span>
-            <p className="font-medium mt-0.5">
-              {grant.onboardingStatus.replace("_", " ")}
-            </p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Area lead</span>
-            <p className="font-medium mt-0.5">{grant.areaLead.name}</p>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="grid gap-4 py-4 text-sm sm:grid-cols-3">
+            <Meta label="Grant status">
+              <StatusChip tone={GRANT_TONE[grant.status] ?? "neutral"}>{grant.status}</StatusChip>
+            </Meta>
+            <Meta label="Onboarding">
+              <StatusChip tone={ONBOARDING_TONE[grant.onboardingStatus] ?? "neutral"}>
+                {grant.onboardingStatus.replace("_", " ")}
+              </StatusChip>
+            </Meta>
+            <Meta label="Area lead">
+              <span className="font-medium text-foreground">{grant.areaLead.name}</span>
+            </Meta>
+          </CardContent>
+        </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Grant details</CardTitle>
+          <CardTitle className="text-xl">Grant details</CardTitle>
         </CardHeader>
         <CardContent>
           {canEdit ? (
             <GrantForm action={boundAction} grant={grant} />
           ) : grant ? (
-            <div className="text-sm space-y-2">
+            <div className="space-y-2 text-sm">
               {grant.amount && (
-                <p><span className="font-medium">Amount: </span>{grant.currency} {grant.amount.toLocaleString()}</p>
+                <p>
+                  <span className="font-medium">Amount: </span>
+                  {grant.currency} {grant.amount.toLocaleString()}
+                </p>
               )}
               {grant.reportingCadence && (
-                <p><span className="font-medium">Reporting cadence: </span>{grant.reportingCadence}</p>
+                <p>
+                  <span className="font-medium">Reporting cadence: </span>
+                  {grant.reportingCadence}
+                </p>
               )}
               {grant.nextReportDue && (
-                <p><span className="font-medium">Next report due: </span>{new Date(grant.nextReportDue).toLocaleDateString()}</p>
+                <p>
+                  <span className="font-medium">Next report due: </span>
+                  {new Date(grant.nextReportDue).toLocaleDateString()}
+                </p>
               )}
               {grant.supportType.length > 0 && (
-                <p><span className="font-medium">Support types: </span>{grant.supportType.join(", ")}</p>
+                <p>
+                  <span className="font-medium">Support types: </span>
+                  {grant.supportType.join(", ")}
+                </p>
               )}
-              {grant.scope && <p><span className="font-medium">Scope: </span>{grant.scope}</p>}
+              {grant.scope && (
+                <p>
+                  <span className="font-medium">Scope: </span>
+                  {grant.scope}
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -120,17 +150,24 @@ export default async function OnboardingPage({
       {grant && (
         <Card>
           <CardHeader>
-            <CardTitle>Key performance indicators</CardTitle>
+            <CardTitle className="text-xl">Key performance indicators</CardTitle>
           </CardHeader>
           <CardContent>
-            <KPITable
-              grantId={grant.id}
-              kpis={grant.kpis}
-              canEdit={canEdit}
-            />
+            <KPITable grantId={grant.id} kpis={grant.kpis} canEdit={canEdit} />
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function Meta({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-1">{children}</div>
     </div>
   );
 }
