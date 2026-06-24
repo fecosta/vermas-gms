@@ -3,24 +3,17 @@ import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/shared/page-header";
-import { StageBadge, STAGE_LABELS } from "@/components/shared/stage-badge";
+import { Button } from "@/components/ui/button";
+import { StatStrip, StatCard } from "@/components/ui/stat";
+import { StatusChip } from "@/components/ui/status-chip";
+import { StageBadge } from "@/components/shared/stage-badge";
 import { AuditLogTable } from "@/components/shared/audit-log-table";
+import { COLUMN_ORDER, columnForStage } from "@/lib/workflow";
+import { cn } from "@/lib/utils";
 import type { Stage } from "@/app/generated/prisma/enums";
-
-const FUNNEL_STAGES: Stage[] = [
-  "SOURCED",
-  "CONCEPT_REVIEW",
-  "APPLICATION_REVIEW",
-  "MEMO_DRAFTING",
-  "PEER_REVIEW",
-  "CEO_COMMITTEE_REVIEW",
-  "LEGAL_DUE_DILIGENCE",
-  "ONBOARDING",
-  "ACTIVE",
-];
 
 const CASE_STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: "Not started",
@@ -36,13 +29,29 @@ const CASE_STATUS_LABELS: Record<string, string> = {
   COMPLETE: "Complete",
 };
 
+// Bar colour per pipeline column (fills/bars may use bright accents; never yellow on cream).
+const COLUMN_BAR: Record<string, string> = {
+  Sourcing: "bg-faint",
+  Screening: "bg-purple",
+  Application: "bg-purple",
+  "Memo Review": "bg-purple",
+  "Legal Due Diligence": "bg-purple",
+  Onboarding: "bg-green",
+  "Active Grant Management": "bg-green",
+};
+
+function daysSince(date: Date): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
+}
+
 export default async function DashboardPage() {
   const session = await auth();
   const user = session!.user as unknown as SessionUser;
 
   if (user.role === "PEER_REVIEWER") redirect("/reviews");
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const [
     stageCounts,
@@ -134,320 +143,327 @@ export default async function DashboardPage() {
         })
       : [];
 
-  const countByStage: Record<string, number> = {};
+  const countByColumn: Record<string, number> = {};
+  for (const col of COLUMN_ORDER) countByColumn[col] = 0;
   for (const s of stageCounts) {
-    countByStage[s.stage] = s._count;
+    countByColumn[columnForStage(s.stage)] += s._count;
   }
-
   const total = stageCounts.reduce((sum, s) => sum + s._count, 0);
+
+  // ---- Presentation-only derived values ----
+  const dateLabel = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = user.name.split(/\s+/)[0];
+  const roleLabel = user.role.replace("_", " ");
+  const isCeo = user.role === "CEO";
+  const pendingTitle = isCeo ? "Pending your decisions" : "Pending CEO decisions";
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description={`Welcome back, ${user.name}`}
-      />
-
-      {/* Role-specific "My work" section */}
-      {user.role === "AL" && myInitiatives.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              My pipeline
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({myInitiatives.length})
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {myInitiatives.map((i) => {
-                const daysAgo = Math.floor(
-                  (Date.now() - new Date(i.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
-                );
-                return (
-                  <Link
-                    key={i.id}
-                    href={`/initiatives/${i.id}`}
-                    className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
-                  >
-                    <span className="text-sm truncate mr-2">{i.name}</span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <StageBadge stage={i.stage} />
-                      <span className="text-xs text-muted-foreground">{daysAgo}d ago</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {user.role === "AD" && myLegalCases.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              My legal cases
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({myLegalCases.length})
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {myLegalCases.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/legal/${c.id}`}
-                  className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
-                >
-                  <span className="text-sm truncate mr-2">{c.initiative.name}</span>
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {CASE_STATUS_LABELS[c.status] ?? c.status}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeInitiatives.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Active portfolio
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({activeInitiatives.length})
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {activeInitiatives.map((i) => (
-                <Link
-                  key={i.id}
-                  href={`/initiatives/${i.id}/active`}
-                  className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
-                >
-                  <div>
-                    <p className="text-sm truncate mr-2">{i.name}</p>
-                    {user.role !== "AL" && (
-                      <p className="text-xs text-muted-foreground">
-                        AL: {i.assignedAl?.name ?? "—"}
-                      </p>
-                    )}
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs shrink-0 ${
-                      i.grant?.status === "PAUSED"
-                        ? "border-amber-300 text-amber-700"
-                        : i.grant?.status === "CLOSED"
-                        ? "text-muted-foreground"
-                        : ""
-                    }`}
-                  >
-                    {i.grant?.status ?? "No grant"}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {user.role === "AT" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Onboarding queue
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({onboardingInitiatives.length})
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {onboardingInitiatives.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No initiatives in onboarding.</p>
-            ) : (
-              <div className="space-y-2">
-                {onboardingInitiatives.map((ini) => (
-                  <Link
-                    key={ini.id}
-                    href={`/initiatives/${ini.id}/onboarding`}
-                    className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{ini.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        AL: {ini.assignedAl?.name ?? "Unassigned"}
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                      {ini.grant?.onboardingStatus.replace("_", " ") ?? "No grant"}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {user.role === "KMD" && strategyDocsNeedingAttention.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Strategy documents
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({strategyDocsNeedingAttention.length} pending)
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {strategyDocsNeedingAttention.map((doc) => (
-                <Link
-                  key={doc.id}
-                  href={`/strategy/${doc.id}`}
-                  className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
-                >
-                  <span className="text-sm truncate mr-2">{doc.title}</span>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs shrink-0 ${doc.status === "IN_REVIEW" ? "border-amber-300 text-amber-700" : ""}`}
-                  >
-                    {doc.status.replace("_", " ")}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pipeline stat cards */}
-      <div className="grid grid-cols-3 gap-3 lg:grid-cols-5">
-        {FUNNEL_STAGES.map((stage) => (
-          <Card key={stage}>
-            <CardContent className="pt-4 pb-3">
-              <p className="text-2xl font-bold">{countByStage[stage] ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
-                {STAGE_LABELS[stage]}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-2xl font-bold">{total}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Total</p>
-          </CardContent>
-        </Card>
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {dateLabel} · {roleLabel}
+          </p>
+          <h1 className="mt-1.5 font-serif text-3xl text-foreground">
+            {greeting}, {firstName}
+          </h1>
+        </div>
+        <Button render={<Link href="/initiatives" />}>
+          <ArrowUpRight className="text-yellow" />
+          Open pipeline
+        </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        {/* Pending CEO decisions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Pending CEO decisions
-              {pendingDecisionInitiatives.length > 0 && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({pendingDecisionInitiatives.length})
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {pendingDecisionInitiatives.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No pending decisions.</p>
-            ) : (
-              <div className="space-y-2">
-                {pendingDecisionInitiatives.map((i) => (
-                  <Link
-                    key={i.id}
-                    href={
-                      i.stage === "CONCEPT_REVIEW"
-                        ? `/initiatives/${i.id}/concept-review`
-                        : `/initiatives/${i.id}/memo`
-                    }
-                    className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
-                  >
-                    <span className="text-sm truncate mr-2">{i.name}</span>
-                    <StageBadge stage={i.stage} />
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Stat strip — real pipeline metrics */}
+      <StatStrip>
+        <StatCard accent="purple" label="Initiatives in pipeline" value={total} />
+        <StatCard
+          accent="purple"
+          valueClassName="text-purple-deep"
+          label={isCeo ? "Decisions pending you" : "Pending CEO decisions"}
+          value={pendingDecisionInitiatives.length}
+        />
+        <StatCard
+          accent="danger"
+          valueClassName={stuckInitiatives.length > 0 ? "text-danger-deep" : undefined}
+          label="Stuck over 30 days"
+          value={stuckInitiatives.length}
+        />
+        <StatCard accent="green" label="Legal DD in progress" value={legalInProgress} />
+      </StatStrip>
 
-        {/* Stuck initiatives */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Stuck &gt;30 days
-              {stuckInitiatives.length > 0 && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({stuckInitiatives.length})
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stuckInitiatives.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No stuck initiatives.</p>
+      <div className="grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+        {/* LEFT */}
+        <div className="flex min-w-0 flex-col gap-6">
+          <SectionCard title={pendingTitle} count={pendingDecisionInitiatives.length}>
+            {pendingDecisionInitiatives.length === 0 ? (
+              <EmptyLine>No pending decisions.</EmptyLine>
             ) : (
-              <div className="space-y-2">
-                {stuckInitiatives.map((i) => {
-                  const daysStuck = Math.floor(
-                    (Date.now() - new Date(i.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
-                  );
+              <div className="flex flex-col">
+                {pendingDecisionInitiatives.map((i) => {
+                  const isConcept = i.stage === "CONCEPT_REVIEW";
                   return (
-                    <Link
+                    <Row
                       key={i.id}
-                      href={`/initiatives/${i.id}`}
-                      className="flex items-center justify-between py-1.5 border-b last:border-0 hover:text-primary transition-colors"
+                      href={
+                        isConcept
+                          ? `/initiatives/${i.id}/concept-review`
+                          : `/initiatives/${i.id}/memo`
+                      }
                     >
-                      <span className="text-sm truncate mr-2">{i.name}</span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <StageBadge stage={i.stage} />
-                        <span className="text-xs text-orange-600">{daysStuck}d</span>
+                      <StatusChip tone={isConcept ? "purple" : "green"}>
+                        {isConcept ? "Concept" : "Memo"}
+                      </StatusChip>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {i.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Waiting {daysSince(i.updatedAt)}d
+                        </p>
                       </div>
-                    </Link>
+                      <span className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                        Review
+                      </span>
+                    </Row>
                   );
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </SectionCard>
 
-      {legalInProgress > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-3 flex items-center justify-between">
-            <div>
-              <p className="font-medium">{legalInProgress} legal DD case{legalInProgress !== 1 ? "s" : ""} in progress</p>
-              <p className="text-sm text-muted-foreground">Pending AD review and trust validation</p>
+          {/* Role-specific "my work" */}
+          {user.role === "AL" && myInitiatives.length > 0 && (
+            <SectionCard title="My pipeline" count={myInitiatives.length}>
+              <div className="flex flex-col">
+                {myInitiatives.map((i) => (
+                  <Row key={i.id} href={`/initiatives/${i.id}`}>
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                      {i.name}
+                    </span>
+                    <StageBadge stage={i.stage} />
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {daysSince(i.updatedAt)}d ago
+                    </span>
+                  </Row>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {user.role === "AD" && myLegalCases.length > 0 && (
+            <SectionCard title="My legal cases" count={myLegalCases.length}>
+              <div className="flex flex-col">
+                {myLegalCases.map((c) => (
+                  <Row key={c.id} href={`/legal/${c.id}`}>
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                      {c.initiative.name}
+                    </span>
+                    <StatusChip tone="neutral">
+                      {CASE_STATUS_LABELS[c.status] ?? c.status}
+                    </StatusChip>
+                  </Row>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {user.role === "KMD" && strategyDocsNeedingAttention.length > 0 && (
+            <SectionCard
+              title="Strategy documents"
+              count={strategyDocsNeedingAttention.length}
+            >
+              <div className="flex flex-col">
+                {strategyDocsNeedingAttention.map((doc) => (
+                  <Row key={doc.id} href={`/strategy/${doc.id}`}>
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                      {doc.title}
+                    </span>
+                    <StatusChip tone={doc.status === "IN_REVIEW" ? "purple" : "neutral"}>
+                      {doc.status.replace("_", " ")}
+                    </StatusChip>
+                  </Row>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {user.role === "AT" && (
+            <SectionCard title="Onboarding queue" count={onboardingInitiatives.length}>
+              {onboardingInitiatives.length === 0 ? (
+                <EmptyLine>No initiatives in onboarding.</EmptyLine>
+              ) : (
+                <div className="flex flex-col">
+                  {onboardingInitiatives.map((ini) => (
+                    <Row key={ini.id} href={`/initiatives/${ini.id}/onboarding`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {ini.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          AL: {ini.assignedAl?.name ?? "Unassigned"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {ini.grant?.onboardingStatus.replace("_", " ") ?? "No grant"}
+                      </span>
+                    </Row>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          <SectionCard title="Stuck over 30 days" count={stuckInitiatives.length}>
+            {stuckInitiatives.length === 0 ? (
+              <EmptyLine>Nothing stuck — the pipeline is moving.</EmptyLine>
+            ) : (
+              <div className="flex flex-col">
+                {stuckInitiatives.map((i) => (
+                  <Row key={i.id} href={`/initiatives/${i.id}`}>
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                      {i.name}
+                    </span>
+                    <StageBadge stage={i.stage} />
+                    <span className="shrink-0 text-xs font-semibold text-danger-deep">
+                      {daysSince(i.updatedAt)}d
+                    </span>
+                  </Row>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* RIGHT */}
+        <div className="flex min-w-0 flex-col gap-6">
+          <SectionCard title="Pipeline by column" eyebrow>
+            <div className="flex flex-col">
+              {COLUMN_ORDER.map((col) => (
+                <div
+                  key={col}
+                  className="flex items-center gap-3 border-t border-dotted border-border py-2.5 first:border-t-0"
+                >
+                  <span className={cn("size-2.5 shrink-0 rounded-sm", COLUMN_BAR[col])} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                    {col}
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {countByColumn[col] ?? 0}
+                  </span>
+                </div>
+              ))}
             </div>
-            <Link href="/legal">
-              <span className="text-sm text-primary hover:underline">View cases →</span>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+          </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AuditLogTable entries={recentLogs} />
-        </CardContent>
-      </Card>
+          {/* Active portfolio — dark panel (yellow allowed on this surface) */}
+          <section className="rounded-2xl bg-panel p-5 text-panel-foreground shadow-lg">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+              Active portfolio
+            </p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="font-serif text-4xl leading-none">
+                {activeInitiatives.length}
+              </span>
+              <span className="text-sm text-white/70">
+                active {activeInitiatives.length === 1 ? "grant" : "grants"}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-col gap-1 border-t border-dotted border-white/15 pt-3">
+              {activeInitiatives.length === 0 ? (
+                <p className="text-sm text-white/55">No active grants yet.</p>
+              ) : (
+                activeInitiatives.slice(0, 6).map((i) => (
+                  <Link
+                    key={i.id}
+                    href={`/initiatives/${i.id}/active`}
+                    className="flex items-center gap-2.5 py-1 text-sm text-white/85 transition-colors hover:text-white"
+                  >
+                    <span
+                      className={cn(
+                        "size-2 shrink-0 rounded-sm",
+                        i.grant?.status === "PAUSED"
+                          ? "bg-yellow"
+                          : i.grant?.status === "CLOSED"
+                          ? "bg-faint"
+                          : "bg-green"
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{i.name}</span>
+                    {user.role !== "AL" && i.assignedAl?.name ? (
+                      <span className="shrink-0 text-xs text-white/45">
+                        {i.assignedAl.name}
+                      </span>
+                    ) : null}
+                  </Link>
+                ))
+              )}
+            </div>
+          </section>
+
+          <SectionCard title="Recent activity" eyebrow>
+            <AuditLogTable entries={recentLogs} />
+          </SectionCard>
+        </div>
+      </div>
     </div>
   );
+}
+
+// ---- Local presentation helpers (server components) ----
+
+function SectionCard({
+  title,
+  count,
+  eyebrow = false,
+  children,
+}: {
+  title: string;
+  count?: number;
+  eyebrow?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          {eyebrow ? (
+            <CardTitle className="font-sans text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {title}
+            </CardTitle>
+          ) : (
+            <CardTitle className="text-xl">{title}</CardTitle>
+          )}
+          {typeof count === "number" && count > 0 ? (
+            <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-foreground">
+              {count}
+            </span>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function Row({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-md border-t border-dotted border-border px-1 py-3 transition-colors first:border-t-0 hover:bg-cream-soft"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function EmptyLine({ children }: { children: ReactNode }) {
+  return <p className="py-2 text-sm text-muted-foreground">{children}</p>;
 }
