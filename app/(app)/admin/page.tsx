@@ -4,17 +4,11 @@ import type { SessionUser } from "@/lib/auth";
 import { can } from "@/lib/authz";
 import { getUsers } from "@/lib/db/users";
 import { prisma } from "@/lib/db/client";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { StatusChip } from "@/components/ui/status-chip";
+import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import Link from "next/link";
 import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
 import { UserActionsCell } from "@/components/admin/user-actions-cell";
@@ -29,6 +23,57 @@ export default async function AdminPage() {
     getUsers(),
     prisma.area.findMany({ orderBy: { name: "asc" } }),
   ]);
+
+  type UserRow = (typeof users)[number];
+  const columns: DataTableColumn<UserRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      cell: (u) => (
+        <span className={cn("font-medium", !u.isActive && "opacity-60")}>{u.name}</span>
+      ),
+    },
+    {
+      key: "email",
+      header: "Email",
+      cell: (u) => <span className="text-muted-foreground">{u.email}</span>,
+    },
+    {
+      key: "role",
+      header: "Role",
+      cell: (u) => <StatusChip tone="neutral">{u.role.replace("_", " ")}</StatusChip>,
+    },
+    {
+      key: "area",
+      header: "Area",
+      cell: (u) => <span className="text-muted-foreground">{u.area?.name ?? "—"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (u) =>
+        u.isActive ? (
+          <StatusChip tone="green">Active</StatusChip>
+        ) : (
+          <StatusChip tone="neutral">Inactive</StatusChip>
+        ),
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      cell: (u) => (
+        <UserActionsCell
+          userId={u.id}
+          currentUserId={user.id}
+          isActive={u.isActive}
+          currentRole={u.role}
+          currentAreaId={u.areaId}
+          areas={areas}
+        />
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -48,57 +93,7 @@ export default async function AdminPage() {
         }
       />
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Area</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map((u) => (
-            <TableRow key={u.id} className={!u.isActive ? "opacity-50" : ""}>
-              <TableCell className="font-medium">{u.name}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {u.email}
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="text-xs">
-                  {u.role.replace("_", " ")}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {u.area?.name ?? "—"}
-              </TableCell>
-              <TableCell>
-                {u.isActive ? (
-                  <Badge className="bg-green-100 text-green-700 border-0 text-xs">
-                    Active
-                  </Badge>
-                ) : (
-                  <Badge className="bg-slate-100 text-slate-500 border-0 text-xs">
-                    Inactive
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                <UserActionsCell
-                  userId={u.id}
-                  currentUserId={user.id}
-                  isActive={u.isActive}
-                  currentRole={u.role}
-                  currentAreaId={u.areaId}
-                  areas={areas}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} />
     </div>
   );
 }
