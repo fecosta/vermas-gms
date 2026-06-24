@@ -6,6 +6,7 @@ import { can } from "@/lib/authz";
 import { getOrganization } from "@/lib/db/organizations";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { StageBadge } from "@/components/shared/stage-badge";
 import { EditOrganizationDialog } from "@/components/organizations/organization-dialog";
@@ -36,7 +37,14 @@ export default async function OrganizationDetailPage({ params }: Props) {
       <PageHeader
         title={org.name}
         description={org.country}
-        action={<EditOrganizationDialog org={org} />}
+        action={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" render={<Link href={`/portal/${org.id}`} />}>
+              Preview portal
+            </Button>
+            <EditOrganizationDialog org={org} />
+          </div>
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2">
