@@ -83,11 +83,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       // Only known, active GMS users may sign in. Deactivating a user revokes access.
-      const dbUser = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, isActive: true },
-      });
-      return Boolean(dbUser && dbUser.isActive);
+      // Surface DB/connectivity errors instead of letting them collapse into a silent AccessDenied.
+      try {
+        const dbUser = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true, isActive: true },
+        });
+        return Boolean(dbUser && dbUser.isActive);
+      } catch (e) {
+        console.error("[signin] user lookup failed:", e instanceof Error ? e.message : String(e));
+        throw e;
+      }
     },
     async jwt({ token, account, profile }) {
       // Initial sign-in: persist Google tokens and graft the GMS identity onto the JWT.
